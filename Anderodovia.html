@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rodovia 3D Retro</title>
+    <title>Rodovia Retro Turbo</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
         #ui { 
             position: absolute; top: 20px; width: 100%; 
-            color: white; text-align: center; font-size: 24px; 
-            text-shadow: 2px 2px #000; pointer-events: none; 
+            color: white; text-align: center; font-size: 32px; font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5); pointer-events: none; 
         }
         .instructions {
-            position: absolute; bottom: 20px; width: 100%;
-            color: rgba(255,255,255,0.5); text-align: center; font-size: 14px;
+            position: absolute; bottom: 30px; width: 100%;
+            color: white; text-align: center; font-size: 16px; opacity: 0.7;
         }
     </style>
 </head>
 <body>
     <div id="ui">SCORE: <span id="score">0</span></div>
-    <div class="instructions">Toque nas laterais para desviar</div>
+    <div class="instructions">SEGURE AS LATERAIS PARA MOVER</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -28,7 +28,6 @@
     const ctx = canvas.getContext('2d');
     const scoreElement = document.getElementById('score');
 
-    // Configurações de tela
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -38,135 +37,30 @@
 
     let score = 0;
     let gameActive = true;
-    let speed = 0.05; // Velocidade do mundo
+    let speed = 0.08; 
     let cameraZ = 0;
 
+    // Configuração do Jogador com interpolação
     const player = {
-        x: 0, // -1 (esquerda) a 1 (direita)
+        x: 0,         // Posição atual
+        targetX: 0,   // Posição desejada
         w: 0.3,
-        color: '#3498db'
+        lerpSpeed: 0.15 // Suavidade do movimento (0 a 1)
     };
 
-    const enemies = [];
+    const obstacles = [];
+    const keys = { left: false, right: false };
 
-    function spawnEnemy() {
+    function spawnObstacle() {
         if(!gameActive) return;
-        const lanes = [-0.5, 0, 0.5];
+        const lanes = [-0.6, 0, 0.6];
         const lane = lanes[Math.floor(Math.random() * lanes.length)];
-        enemies.push({ x: lane, z: cameraZ + 20, color: '#e74c3c' });
+        obstacles.push({ x: lane, z: cameraZ + 30, type: 'rock' });
     }
 
-    setInterval(spawnEnemy, 1000);
+    setInterval(spawnObstacle, 800);
 
-    // Função para projetar coordenadas 3D em 2D
     function project(pX, pY, pZ) {
-        const perspective = 0.5;
+        const perspective = 0.6;
         const scale = perspective / (pZ - cameraZ);
         const x = (canvas.width / 2) + (pX * scale * canvas.width);
-        const y = (canvas.height / 2) + (pY * scale * canvas.height);
-        const w = scale * canvas.width;
-        return { x, y, w };
-    }
-
-    function update() {
-        if (!gameActive) return;
-
-        score++;
-        scoreElement.innerText = Math.floor(score / 10);
-        cameraZ += speed;
-        speed += 0.00001; // Aceleração gradual
-
-        enemies.forEach((enemy, index) => {
-            // Colisão básica
-            if (enemy.z - cameraZ < 0.5 && enemy.z - cameraZ > 0) {
-                if (Math.abs(player.x - enemy.x) < 0.3) {
-                    gameActive = false;
-                    alert("GAME OVER! Score: " + Math.floor(score/10));
-                    location.reload();
-                }
-            }
-            if (enemy.z < cameraZ) enemies.splice(index, 1);
-        });
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Desenhar Céu
-        ctx.fillStyle = "#1a1a2e";
-        ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
-
-        // Desenhar Chão/Grama
-        ctx.fillStyle = "#16a085";
-        ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
-
-        // Desenhar Estrada (Perspectiva)
-        for (let i = 100; i > 0; i--) {
-            const z1 = cameraZ + i;
-            const z2 = cameraZ + i - 1;
-            const p1 = project(-1, 0.5, z1);
-            const p2 = project(-1, 0.5, z2);
-            const p3 = project(1, 0.5, z2);
-            const p4 = project(1, 0.5, z1);
-
-            ctx.fillStyle = (Math.floor(z1) % 2 === 0) ? "#333" : "#444";
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
-            ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
-            ctx.fill();
-
-            // Faixas brancas
-            if (Math.floor(z1) % 2 === 0) {
-                ctx.fillStyle = "white";
-                const line = project(-0.05, 0.5, z1);
-                const lineNext = project(0.05, 0.5, z2);
-                ctx.fillRect(line.x, line.y, (p3.x - p2.x) * 0.05, 2);
-            }
-        }
-
-        // Desenhar Inimigos
-        enemies.forEach(enemy => {
-            const p = project(enemy.x, 0.5, enemy.z);
-            if(p.w > 0) {
-                ctx.fillStyle = enemy.color;
-                ctx.fillRect(p.x - p.w/2, p.y - p.w, p.w, p.w);
-            }
-        });
-
-        // Desenhar Jogador (Fixo na frente)
-        const playerSize = canvas.width * 0.2;
-        ctx.fillStyle = player.color;
-        ctx.fillRect(
-            (canvas.width / 2) + (player.x * canvas.width * 0.4) - playerSize/2, 
-            canvas.height - playerSize - 20, 
-            playerSize, 
-            playerSize * 0.8
-        );
-    }
-
-    // Controles (PC e Celular)
-    function moveLeft() { if(player.x > -0.6) player.x -= 0.1; }
-    function moveRight() { if(player.x < 0.6) player.x += 0.1; }
-
-    window.addEventListener('keydown', (e) => {
-        if (e.key === "ArrowLeft") moveLeft();
-        if (e.key === "ArrowRight") moveRight();
-    });
-
-    canvas.addEventListener('touchstart', (e) => {
-        const touchX = e.touches[0].clientX;
-        if (touchX < window.innerWidth / 2) moveLeft();
-        else moveRight();
-        e.preventDefault();
-    }, {passive: false});
-
-    function loop() {
-        update();
-        draw();
-        requestAnimationFrame(loop);
-    }
-
-    loop();
-</script>
-</body>
-</html>
