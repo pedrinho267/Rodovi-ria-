@@ -3,31 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ultra Realism 3D Drive</title>
+    <title>Simulador 3D Ultra Night</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        canvas { display: block; }
-        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; text-align: center; pointer-events: none; }
-        .controls { display: none; position: absolute; bottom: 40px; width: 100%; justify-content: space-around; pointer-events: auto; }
-        button { width: 80px; height: 80px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: white; font-weight: bold; }
-        @media (max-width: 768px) { .controls { display: flex; } }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; }
+        #controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
+        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; user-select: none; pointer-events: auto; }
     </style>
 </head>
 <body>
-
-    <div id="ui">Use WASD ou Setas no PC <br> Botões no Celular</div>
-    
-    <div class="controls">
-        <button id="btnLeft">ESQ</button>
-        <button id="btnRight">DIR</button>
+    <div id="ui">
+        <h1>Night Drive 3D</h1>
+        <p>Use Setas ou Toque na Tela</p>
+    </div>
+    <div id="controls">
+        <div class="btn" id="leftBtn">LEFT</div>
+        <div class="btn" id="rightBtn">RIGHT</div>
     </div>
 
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
-
     <script type="module">
-        import * as THREE from 'three';
+        import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
 
         // --- CONFIGURAÇÃO DA CENA ---
         const scene = new THREE.Scene();
@@ -37,26 +32,125 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- ILUMINAÇÃO (100% REALISMO DE LUZ) ---
-        const ambientLight = new THREE.AmbientLight(0x404040, 2); 
+        // --- ILUMINAÇÃO (O realismo vem daqui) ---
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
         scene.add(ambientLight);
 
-        const spotLight = new THREE.SpotLight(0xffffff, 100);
-        spotLight.position.set(0, 10, 0);
-        spotLight.castShadow = true;
-        scene.add(spotLight);
-
-        // --- CHÃO (ESTRADA) ---
+        // --- CRIAÇÃO DA ESTRADA ---
         const roadGeo = new THREE.PlaneGeometry(20, 1000);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
-        road.receiveShadow = true;
         scene.add(road);
 
-        // --- O CARRO (JOGADOR) ---
-        const carGroup = new THREE.Group();
-        const body
+        // Faixa central
+        const stripeGeo = new THREE.PlaneGeometry(0.2, 2);
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const stripes = [];
+        for(let i = 0; i < 50; i++) {
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.y = 0.01;
+            stripe.position.z = -i * 5;
+            scene.add(stripe);
+            stripes.push(stripe);
+        }
+
+        // --- CARRO DO JOGADOR (Cubo representativo) ---
+        const carGeo = new THREE.BoxGeometry(1, 0.5, 2);
+        const carMat = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+        const playerCar = new THREE.Mesh(carGeo, carMat);
+        playerCar.position.y = 0.25;
+        playerCar.position.z = -5;
+        scene.add(playerCar);
+
+        // Faróis do carro
+        const headlight = new THREE.SpotLight(0xffffff, 10, 20, 0.5);
+        headlight.position.set(0, 0, -1);
+        playerCar.add(headlight);
+        playerCar.add(headlight.target);
+        headlight.target.position.set(0, 0, -10);
+
+        // --- POSTES DE LUZ ---
+        const poles = [];
+        function createPole(z, side) {
+            const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 5);
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.set(side * 8, 2.5, z);
+            
+            const lamp = new THREE.PointLight(0xffaa00, 2, 10);
+            lamp.position.set(0, 2.5, 0);
+            pole.add(lamp);
+            
+            scene.add(pole);
+            poles.push(pole);
+        }
+
+        for(let i = 0; i < 10; i++) {
+            createPole(-i * 15, 1);
+            createPole(-i * 15, -1);
+        }
+
+        // --- LÓGICA DE MOVIMENTO ---
+        let moveLeft = false;
+        let moveRight = false;
+        const speed = 0.5;
+
+        // Controles PC
+        window.addEventListener('keydown', (e) => {
+            if(e.key === "ArrowLeft") moveLeft = true;
+            if(e.key === "ArrowRight") moveRight = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.key === "ArrowLeft") moveLeft = false;
+            if(e.key === "ArrowRight") moveRight = false;
+        });
+
+        // Controles Mobile
+        document.getElementById('leftBtn').ontouchstart = () => moveLeft = true;
+        document.getElementById('leftBtn').ontouchend = () => moveLeft = false;
+        document.getElementById('rightBtn').ontouchstart = () => moveRight = true;
+        document.getElementById('rightBtn').ontouchend = () => moveRight = false;
+
+        camera.position.set(0, 3, 2);
+        camera.lookAt(playerCar.position);
+
+        // --- LOOP DE ANIMAÇÃO (60 FPS) ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Movimento das faixas e postes (simula velocidade)
+            stripes.forEach(s => {
+                s.position.z += speed;
+                if(s.position.z > 5) s.position.z = -200;
+            });
+
+            poles.forEach(p => {
+                p.position.z += speed;
+                if(p.position.z > 10) p.position.z = -140;
+            });
+
+            // Movimento lateral do jogador
+            if(moveLeft && playerCar.position.x > -4) playerCar.position.x -= 0.1;
+            if(moveRight && playerCar.position.x < 4) playerCar.position.x += 0.1;
+
+            // Suavidade da câmera
+            camera.position.x = playerCar.position.x * 0.5;
+            
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Ajuste de tela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
