@@ -2,86 +2,38 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dino Adventure</title>
+    <title>Night Highway Racer</title>
     <style>
         body {
             margin: 0;
+            padding: 0;
+            background: #000;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
-            touch-action: manipulation;
         }
 
-        #game-board {
+        #game-container {
             position: relative;
-            width: 600px;
-            height: 200px;
-            background-color: white;
-            border-bottom: 2px solid #535353;
-            overflow: hidden;
+            width: 800px;
+            height: 600px;
+            border: 4px solid #333;
+            background: #000;
         }
 
-        /* DINO */
-        #dino {
-            position: absolute;
-            width: 40px;
-            height: 45px;
-            bottom: 0;
-            left: 50px;
-            background-color: #535353;
-            border-radius: 4px;
-        }
-        #dino::after { /* Olho do Dino */
-            content: '';
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 4px;
-            height: 4px;
-            background-color: white;
+        canvas {
+            display: block;
         }
 
-        /* CACTO */
-        .cactus {
+        /* Telas de UI */
+        .overlay {
             position: absolute;
-            bottom: 0;
-            width: 20px;
-            height: 40px;
-            background-color: #535353;
-        }
-
-        /* NUVEM */
-        .cloud {
-            position: absolute;
-            background: #d3d3d3;
-            width: 40px;
-            height: 15px;
-            border-radius: 20px;
-            opacity: 0.5;
-        }
-
-        /* UI */
-        #score-board {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 18px;
-            color: #535353;
-            font-weight: bold;
-        }
-
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255,255,255,0.8);
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -89,154 +41,244 @@
             z-index: 10;
         }
 
-        h1 { color: #535353; margin-bottom: 10px; }
+        h1 { font-size: 50px; color: #00d4ff; text-shadow: 0 0 15px #00d4ff; margin-bottom: 10px; }
+        p { font-size: 18px; margin-bottom: 20px; }
+
         button {
-            padding: 10px 25px;
-            font-size: 16px;
-            background: #535353;
-            color: white;
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #ff4d4d;
             border: none;
+            color: white;
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: 5px;
+            transition: 0.3s;
         }
-        button:hover { background: #333; }
+
+        button:hover { background: #ff1a1a; transform: scale(1.1); }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 5;
+            text-shadow: 2px 2px 5px #000;
+        }
+
+        #game-over { display: none; }
     </style>
 </head>
 <body>
 
-<div id="game-board">
-    <div id="score-board">00000</div>
-    <div id="dino"></div>
+<div id="game-container">
+    <div id="hud">Score: 0</div>
     
-    <div id="overlay">
-        <h1 id="status-text">DINO RUN</h1>
-        <button id="start-btn">JOGAR</button>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div id="menu" class="overlay">
+        <h1>CITY NIGHTS</h1>
+        <p>Use as SETAS para mover e desviar do trânsito!</p>
+        <button onclick="startGame()">INICIAR JOGO</button>
+    </div>
+
+    <div id="game-over" class="overlay">
+        <h1 style="color: #ff4d4d; text-shadow: 0 0 15px #ff4d4d;">GAME OVER</h1>
+        <p id="final-score">Pontos: 0</p>
+        <button onclick="startGame()">TENTAR NOVAMENTE</button>
     </div>
 </div>
 
 <script>
-    const board = document.getElementById('game-board');
-    const dino = document.getElementById('dino');
-    const scoreBoard = document.getElementById('score-board');
-    const overlay = document.getElementById('overlay');
-    const startBtn = document.getElementById('start-btn');
-    const statusText = document.getElementById('status-text');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const hud = document.getElementById('hud');
+const menu = document.getElementById('menu');
+const gameOverScreen = document.getElementById('game-over');
+const finalScoreText = document.getElementById('final-score');
 
-    // Configurações do Jogo
-    let gameRunning = false;
-    let score = 0;
-    let gravity = 0.6;
-    let jumpStrength = -12;
-    let velocityY = 0;
-    let dinoY = 0;
-    let gameSpeed = 5;
-    let obstacles = [];
-    let clouds = [];
+// Configurações do Jogo
+let speed = 0.02;
+let score = 0;
+let isGameOver = true;
+let playerX = 0; // -1 (esquerda) a 1 (direita)
+let roadPosition = 0;
+let obstacles = [];
+let decoration = [];
 
-    function startGame() {
-        score = 0;
-        gameSpeed = 5;
-        obstacles.forEach(o => o.el.remove());
-        clouds.forEach(c => c.el.remove());
-        obstacles = [];
-        clouds = [];
-        dinoY = 0;
-        velocityY = 0;
-        gameRunning = true;
-        overlay.style.display = 'none';
-        requestAnimationFrame(update);
+// Teclado
+const keys = { Left: false, Right: false };
+window.addEventListener('keydown', e => {
+    if(e.key === "ArrowLeft") keys.Left = true;
+    if(e.key === "ArrowRight") keys.Right = true;
+});
+window.addEventListener('keyup', e => {
+    if(e.key === "ArrowLeft") keys.Left = false;
+    if(e.key === "ArrowRight") keys.Right = false;
+});
+
+function startGame() {
+    score = 0;
+    playerX = 0;
+    roadPosition = 0;
+    obstacles = [];
+    isGameOver = false;
+    speed = 0.02;
+    menu.style.display = 'none';
+    gameOverScreen.style.display = 'none';
+    
+    // Gerar prédios e luzes fixas
+    decoration = [];
+    for(let i = 0; i < 20; i++) {
+        decoration.push({ z: i * 0.1, side: i % 2 === 0 ? 1 : -1, type: i % 3 === 0 ? 'building' : 'light' });
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function update() {
+    if(isGameOver) return;
+
+    // Movimento lateral
+    if(keys.Left) playerX -= 0.03;
+    if(keys.Right) playerX += 0.03;
+    playerX = Math.max(-1.2, Math.min(1.2, playerX));
+
+    roadPosition += speed;
+    score += 1;
+    hud.innerText = `Score: ${Math.floor(score/10)}`;
+    speed += 0.00001; // Aumenta dificuldade
+
+    // Gerar obstáculos (Ônibus Vermelho)
+    if(Math.random() < 0.02) {
+        obstacles.push({
+            z: 2, // Longe no horizonte
+            x: (Math.random() * 2 - 1),
+            type: 'bus'
+        });
     }
 
-    function jump() {
-        if (dinoY === 0 && gameRunning) {
-            velocityY = jumpStrength;
-        }
-    }
+    // Atualizar obstáculos
+    for(let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].z -= speed;
 
-    function createCactus() {
-        if (Math.random() < 0.02 && obstacles.length < 2) {
-            const el = document.createElement('div');
-            el.className = 'cactus';
-            const left = 600;
-            board.appendChild(el);
-            obstacles.push({ el, left });
-        }
-    }
-
-    function createCloud() {
-        if (Math.random() < 0.01) {
-            const el = document.createElement('div');
-            el.className = 'cloud';
-            const left = 600;
-            const top = Math.random() * 80 + 20;
-            board.appendChild(el);
-            clouds.push({ el, left, top });
-        }
-    }
-
-    function update() {
-        if (!gameRunning) return;
-
-        // Física do Pulo
-        velocityY += gravity;
-        dinoY -= velocityY;
-        if (dinoY < 0) {
-            dinoY = 0;
-            velocityY = 0;
-        }
-        dino.style.bottom = dinoY + 'px';
-
-        // Obstáculos
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            obstacles[i].left -= gameSpeed;
-            obstacles[i].el.style.left = obstacles[i].left + 'px';
-
-            // Colisão (Hitbox um pouco menor para ser justo)
-            if (obstacles[i].left < 90 && obstacles[i].left > 50 && dinoY < 40) {
-                gameOver();
-            }
-
-            if (obstacles[i].left < -20) {
-                obstacles[i].el.remove();
-                obstacles.splice(i, 1);
-                score += 10;
-                gameSpeed += 0.1; // Aumenta dificuldade
+        // Detecção de Colisão
+        if(obstacles[i].z < 0.2 && obstacles[i].z > 0.05) {
+            if(Math.abs(obstacles[i].x - playerX) < 0.4) {
+                endGame();
             }
         }
 
-        // Nuvens
-        for (let i = clouds.length - 1; i >= 0; i--) {
-            clouds[i].left -= 1;
-            clouds[i].el.style.left = clouds[i].left + 'px';
-            clouds[i].el.style.top = clouds[i].top + 'px';
-            if (clouds[i].left < -50) {
-                clouds[i].el.remove();
-                clouds.splice(i, 1);
-            }
-        }
+        if(obstacles[i].z < 0) obstacles.splice(i, 1);
+    }
+}
 
-        createCactus();
-        createCloud();
+function draw() {
+    // 1. Céu (Preto)
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 2. Grama (Verde Escuro)
+    ctx.fillStyle = "#1a3300";
+    ctx.fillRect(0, 300, canvas.width, 300);
+
+    // 3. Estrada (Perspectiva)
+    const horizon = 300;
+    const widthAtBottom = 600;
+    const widthAtTop = 20;
+
+    ctx.fillStyle = "#333";
+    ctx.beginPath();
+    ctx.moveTo(canvas.width/2 - widthAtTop, horizon);
+    ctx.lineTo(canvas.width/2 + widthAtTop, horizon);
+    ctx.lineTo(canvas.width/2 + widthAtBottom, canvas.height);
+    ctx.lineTo(canvas.width/2 - widthAtBottom, canvas.height);
+    ctx.fill();
+
+    // Linhas da Estrada
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    for(let i = 0; i < 10; i++) {
+        let z = ((i - roadPosition * 5) % 10 + 10) % 10 / 10;
+        let y = horizon + z * 300;
+        let w = z * 20;
+        if(y > horizon) {
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, y);
+            ctx.lineTo(canvas.width/2, y + 20 * z);
+            ctx.stroke();
+        }
+    }
+
+    // 4. Desenhar Prédios e Postes (Decoração lateral)
+    decoration.forEach(obj => {
+        obj.z -= speed;
+        if(obj.z < 0) obj.z = 2;
+
+        let scale = 1 / obj.z;
+        let x = canvas.width/2 + (obj.side * 200 * scale);
+        let y = horizon + (100 * scale);
         
-        scoreBoard.innerText = Math.floor(score).toString().padStart(5, '0');
-        requestAnimationFrame(update);
-    }
-
-    function gameOver() {
-        gameRunning = false;
-        overlay.style.display = 'flex';
-        statusText.innerText = 'GAME OVER';
-        startBtn.innerText = 'TENTAR NOVAMENTE';
-    }
-
-    // Input Listeners
-    window.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') jump(); });
-    window.addEventListener('touchstart', jump);
-    startBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        startGame();
+        if(obj.type === 'building') {
+            ctx.fillStyle = obj.side > 0 ? "#4a3b32" : "#2d4a3e";
+            ctx.fillRect(x - (30*scale), y - (150*scale), 60*scale, 150*scale);
+            // Janelas
+            ctx.fillStyle = "#add8e6";
+            ctx.fillRect(x - (10*scale), y - (120*scale), 10*scale, 10*scale);
+        } else {
+            // Poste de Luz
+            ctx.strokeStyle = "#777";
+            ctx.lineWidth = 5 * scale;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y - 80 * scale);
+            ctx.stroke();
+            // Brilho da lâmpada
+            ctx.fillStyle = "rgba(255, 255, 150, 0.6)";
+            ctx.beginPath();
+            ctx.arc(x, y - 80 * scale, 15 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
     });
+
+    // 5. Obstáculos (Ônibus Vermelho)
+    obstacles.forEach(obs => {
+        let scale = 1 / obs.z;
+        let x = canvas.width/2 + (obs.x * 300 * scale);
+        let y = horizon + (250 * scale);
+        let w = 120 * scale;
+        let h = 80 * scale;
+
+        ctx.fillStyle = "#ff0000"; // Vermelho como na imagem
+        ctx.fillRect(x - w/2, y - h, w, h);
+        ctx.fillStyle = "#333"; // Vidros
+        ctx.fillRect(x - w/2 + 5, y - h + 5, w - 10, h/3);
+    });
+
+    // 6. Player (Carro Azul)
+    let pScale = 1 / 0.15;
+    let px = canvas.width/2 + (playerX * 300 * 0.15);
+    let py = canvas.height - 20;
+    ctx.fillStyle = "#00d4ff";
+    ctx.fillRect(px - 40, py - 60, 80, 50); // Corpo
+    ctx.fillStyle = "#000";
+    ctx.fillRect(px - 35, py - 55, 70, 20); // Vidro
+}
+
+function endGame() {
+    isGameOver = true;
+    gameOverScreen.style.display = 'flex';
+    finalScoreText.innerText = `Pontuação Final: ${Math.floor(score/10)}`;
+}
+
+function gameLoop() {
+    update();
+    draw();
+    if(!isGameOver) requestAnimationFrame(gameLoop);
+}
 </script>
 
 </body>
-</html>
+    </html>
