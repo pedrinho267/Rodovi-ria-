@@ -2,129 +2,152 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Motorista 3D - Versão Corrigida</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midnight Drive 3D - Fiel à Foto</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none; z-index: 10; }
-        #msg { position: absolute; top: 50%; width: 100%; text-align: center; color: white; font-size: 20px; display: none; background: rgba(0,0,0,0.7); padding: 20px 0; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #00ff00; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #000; }
+        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: white; font-size: 12px; opacity: 0.5; }
     </style>
 </head>
 <body>
     <div id="ui">SCORE: <span id="score">0</span></div>
-    <div id="msg">BATIDA! Reiniciando...</div>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
-    </script>
+    <div id="controles">PC: SETAS | MOBILE: TOQUE LATERAIS</div>
 
     <script type="module">
-        import * as THREE from 'three';
+        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 
-        // CONFIGURAÇÕES
-        let score = 0;
-        let speed = 0.8;
-        let gameActive = true;
-        const obstacles = [];
-        const buildings = [];
-        const keys = { Left: false, Right: false };
-
-        // CENA
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 20, 100);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 5, 15);
-        camera.lookAt(0, 0, -5);
-
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // LUZES
-        const light = new THREE.DirectionalLight(0xffffff, 1.5);
-        light.position.set(10, 20, 10);
-        light.castShadow = true;
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        // --- AMBIENTE (ESTRADA E GRAMA) ---
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
 
-        // CHÃO E ESTRADA
-        const world = new THREE.Group();
-        scene.add(world);
+        function createFloor() {
+            const planeGeo = new THREE.PlaneGeometry(100, 200);
+            const planeMat = new THREE.MeshPhongMaterial({ color: 0x003300 }); // Grama verde escuro
+            const floor = new THREE.Mesh(planeGeo, planeMat);
+            floor.rotation.x = -Math.PI / 2;
+            worldGroup.add(floor);
 
-        const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(200, 1000),
-            new THREE.MeshPhongMaterial({ color: 0x228B22 })
-        );
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        world.add(ground);
+            // Asfalto
+            const roadGeo = new THREE.PlaneGeometry(14, 200);
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.position.y = 0.01;
+            floor.add(road);
 
-        const road = new THREE.Mesh(
-            new THREE.PlaneGeometry(12, 1000),
-            new THREE.MeshPhongMaterial({ color: 0x333333 })
-        );
-        road.position.y = 0.05;
-        ground.add(road);
-
-        // Faixas Centrais Azuis (Detalhe da sua foto)
-        for(let x of [-0.4, 0.4]) {
-            const line = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.2, 1000),
-                new THREE.MeshBasicMaterial({ color: 0x0000ff })
-            );
-            line.position.set(x, 0.1, 0);
-            ground.add(line);
-        }
-
-        // CARRO DO JOGADOR
-        const player = new THREE.Mesh(
-            new THREE.BoxGeometry(1.2, 0.6, 2),
-            new THREE.MeshPhongMaterial({ color: 0x00aaff })
-        );
-        player.position.set(0, 0.35, 8);
-        player.castShadow = true;
-        scene.add(player);
-
-        // FUNÇÃO PARA CRIAR OBSTÁCULOS (CARROS E ÔNIBUS)
-        function spawnObstacle() {
-            const isBus = Math.random() > 0.7;
-            const h = isBus ? 1.4 : 0.6;
-            const l = isBus ? 4.5 : 2;
-            const color = isBus ? 0xff0000 : (Math.random() > 0.5 ? 0xffff00 : 0xff00ff);
+            // Faixas centrais azuis (detalhe da sua foto)
+            const blueLineGeo = new THREE.PlaneGeometry(0.3, 200);
+            const blueLineMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            const line1 = new THREE.Mesh(blueLineGeo, blueLineMat);
+            line1.position.set(-0.5, 0.02, 0);
+            floor.add(line1);
+            const line2 = new THREE.Mesh(blueLineGeo, blueLineMat);
+            line2.position.set(0.5, 0.02, 0);
+            floor.add(line2);
             
-            const obs = new THREE.Mesh(
-                new THREE.BoxGeometry(1.2, h, l),
-                new THREE.MeshPhongMaterial({ color: color })
-            );
-            obs.position.set(Math.random() > 0.5 ? -3 : 3, h/2, -60);
-            obs.castShadow = true;
-            scene.add(obs);
-            obstacles.push(obs);
+            // Faixas brancas pontilhadas
+            for(let i = -100; i < 100; i += 10) {
+                const stripeGeo = new THREE.PlaneGeometry(0.5, 5);
+                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const s = new THREE.Mesh(stripeGeo, stripeMat);
+                s.position.set(0, 0.03, i);
+                floor.add(s);
+            }
+        }
+        createFloor();
+
+        // --- POSTES DE LUZ (IGUAL À FOTO) ---
+        function createStreetLight(z) {
+            const pole = new THREE.Group();
+            const stick = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
+            stick.position.y = 4;
+            pole.add(stick);
+
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
+            arm.position.set(-1, 8, 0);
+            pole.add(arm);
+
+            const light = new THREE.PointLight(0xffffaa, 5, 15);
+            light.position.set(-2, 7.5, 0);
+            pole.add(light);
+
+            pole.position.set(8, 0, z);
+            worldGroup.add(pole);
         }
 
-        // CONTROLES
-        window.addEventListener('keydown', (e) => {
-            if (e.key === "ArrowLeft") keys.Left = true;
-            if (e.key === "ArrowRight") keys.Right = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            if (e.key === "ArrowLeft") keys.Left = false;
-            if (e.key === "ArrowRight") keys.Right = false;
-        });
-        // Touch Mobile
-        window.addEventListener('touchstart', (e) => {
-            if (e.touches[0].clientX < window.innerWidth/2) keys.Left = true;
-            else keys.Right = true;
-        });
-        window.addEventListener('touchend', () => { keys.Left = false; keys.Right = false; });
+        for(let i = 0; i > -200; i -= 30) {
+            createStreetLight(i);
+            createStreetLight(i + 15);
+        }
 
-        // LOOP DE ANIMAÇÃO
-        function animate() {
-            if (!gameActive) return
+        // --- JOGADOR (CARRO AZUL) ---
+        const player = new THREE.Group();
+        const carBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 2.2), new THREE.MeshPhongMaterial({color: 0x00ccff}));
+        carBody.position.y = 0.5;
+        player.add(carBody);
+        scene.add(player);
+        player.position.set(-3, 0, 10);
+
+        // --- INIMIGOS E OBSTÁCULOS ---
+        const obstacles = [];
+        function spawnEnemy() {
+            const isBus = Math.random() > 0.7;
+            const color = isBus ? 0xff0000 : (Math.random() > 0.5 ? 0xffff00 : 0xff00ff);
+            const geo = isBus ? new THREE.BoxGeometry(1.5, 1.5, 5) : new THREE.BoxGeometry(1.2, 0.7, 2.2);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color: color}));
+            
+            const lane = (Math.floor(Math.random() * 2) === 0) ? -3.5 : 3.5;
+            mesh.position.set(lane, isBus ? 0.75 : 0.5, -80);
+            scene.add(mesh);
+            obstacles.push(mesh);
+        }
+
+        // --- LÓGICA ---
+        let score = 0;
+        let speed = 0.8;
+        const keys = { left: false, right: false };
+
+        window.onkeydown = (e) => { 
+            if(e.code == "ArrowLeft") keys.left = true;
+            if(e.code == "ArrowRight") keys.right = true;
+        };
+        window.onkeyup = (e) => { 
+            if(e.code == "ArrowLeft") keys.left = false;
+            if(e.code == "ArrowRight") keys.right = false;
+        };
+
+        // Mobile
+        window.ontouchstart = (e) => {
+            if(e.touches[0].clientX < window.innerWidth/2) keys.left = true;
+            else keys.right = true;
+        };
+        window.ontouchend = () => { keys.left = false; keys.right = false; };
+
+        function update() {
+            requestAnimationFrame(update);
+
+            // Movimento do mundo (Loop infinito)
+            worldGroup.position.z += speed;
+            if(worldGroup.position.z > 50) worldGroup.position.z = 0;
+
+            // Movimento Jogador
+            if(keys.left && player.position.x > -5) player.position.x -= 0.2;
+            if(keys.right && player.position.x < 5) player.position.x += 0.2;
+
+            // Obstáculos
+            if(Math.random() < 0.03) spawnEnemy();
+            
+            obstacles.forEach((obj, i) => {
+                obj.position.z += speed;
+                
+                // Colisão
+                const
