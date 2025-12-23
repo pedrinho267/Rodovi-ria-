@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Highway Evolution</title>
+    <title>Retro Highway Traffic</title>
     <style>
         :root { --neon-blue: #3498db; --neon-red: #e74c3c; }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
@@ -15,41 +15,42 @@
             pointer-events: none; color: white;
         }
 
-        #score-box { font-size: 32px; font-weight: 900; margin-top: 20px; text-shadow: 0 0 10px var(--neon-blue); opacity: 0; z-index: 5; transition: 0.5s; }
-
-        #controls {
-            position: absolute; bottom: 40px; width: 100%;
-            display: flex; justify-content: space-between; padding: 0 30px;
-            box-sizing: border-box; pointer-events: none;
-        }
-
-        .ctrl-btn {
-            width: 80px; height: 80px; border-radius: 50%;
-            background: rgba(52, 152, 219, 0.2); border: 3px solid var(--neon-blue);
-            color: white; font-size: 30px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-            pointer-events: all; user-select: none;
-            box-shadow: 0 0 15px var(--neon-blue);
-            -webkit-user-select: none;
-        }
-
-        .ctrl-btn:active { background: var(--neon-blue); transform: scale(0.9); }
+        #score-box { font-size: 32px; font-weight: 900; margin-top: 20px; text-shadow: 0 0 10px var(--neon-blue); opacity: 0; }
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
             justify-content: center; align-items: center; pointer-events: all;
-            z-index: 10;
+            transition: opacity 0.3s;
         }
 
         h1 { font-size: 48px; margin-bottom: 20px; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); }
         
-        button.menu-btn {
+        button {
             padding: 15px 50px; font-size: 24px; font-weight: bold; cursor: pointer;
             background: transparent; border: 3px solid var(--neon-blue); color: white;
             text-transform: uppercase; transition: 0.2s; box-shadow: 0 0 15px var(--neon-blue);
-            pointer-events: all;
         }
+
+        /* Estilos dos Botões de Direção */
+        #controls {
+            position: fixed; bottom: 30px; width: 100%;
+            display: flex; justify-content: space-between;
+            padding: 0 30px; box-sizing: border-box; pointer-events: none;
+            z-index: 10;
+        }
+
+        .control-btn {
+            width: 80px; height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%; color: white; font-size: 30px;
+            pointer-events: auto; user-select: none;
+            display: flex; align-items: center; justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active { background: rgba(52, 152, 219, 0.5); border-color: var(--neon-blue); }
 
         .hidden { display: none !important; }
     </style>
@@ -61,100 +62,69 @@
     <div id="ui-layer">
         <div id="score-box">SCORE: <span id="score-val">0</span></div>
         
-        <div id="controls" class="hidden">
-            <div class="ctrl-btn" id="btn-left">◀</div>
-            <div class="ctrl-btn" id="btn-right">▶</div>
-        </div>
-
         <div id="main-menu" class="overlay">
             <h1>TRAFFIC DRIVE</h1>
-            <button class="menu-btn" onclick="startGame()">JOGAR</button>
+            <button onclick="startGame()">JOGAR</button>
+        </div>
+
+        <div id="game-over" class="overlay hidden">
+            <h1 style="color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red);">BATEU!</h1>
+            <p id="final-score" style="font-size: 20px; margin-bottom: 20px;"></p>
+            <button onclick="startGame()" style="border-color: var(--neon-red); box-shadow: 0 0 15px var(--neon-red);">REPETIR</button>
         </div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const mainMenu = document.getElementById('main-menu');
-        const scoreBox = document.getElementById('score-box');
-        const controls = document.getElementById('controls');
+    <div id="controls" class="hidden" id="touch-controls">
+        <div id="btnLeft" class="control-btn">◀</div>
+        <div id="btnRight" class="control-btn">▶</div>
+    </div>
 
-        let gameActive = false;
-        let player = {
-            x: 0,
-            y: 0,
-            w: 50,
-            h: 90,
-            speed: 8
-        };
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    let width, height, halfW, halfH;
+    let gameState = 'MENU';
+    let score = 0;
+    let speed = 0;
+    let cameraZ = 0;
+    let spawnTimer = 0;
+    const INITIAL_SPEED = 14.0;
+    const ACCELERATION = 0.4;
 
-        let moveLeft = false;
-        let moveRight = false;
+    const player = { x: 0, targetX: 0, lerpCoeff: 10 };
+    let obstacles = [];
+    const keys = { left: false, right: false };
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            player.x = canvas.width / 2 - player.w / 2;
-            player.y = canvas.height - 150;
-        }
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        halfW = width / 2; halfH = height / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-        window.addEventListener('resize', resize);
-        resize();
+    function startGame() {
+        score = 0;
+        speed = INITIAL_SPEED;
+        cameraZ = 0;
+        player.x = 0;
+        player.targetX = 0;
+        obstacles = [];
+        spawnTimer = 0;
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('score-box').style.opacity = '1';
+        document.getElementById('controls').classList.remove('hidden'); // Mostra botões
+        gameState = 'PLAYING';
+    }
 
-        // Configuração dos botões de direção
-        const bL = document.getElementById('btn-left');
-        const bR = document.getElementById('btn-right');
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        document.getElementById('game-over').classList.remove('hidden');
+        document.getElementById('controls').classList.add('hidden'); // Esconde botões
+        document.getElementById('final-score').innerText = "SCORE FINAL: " + Math.floor(score);
+    }
 
-        const startLeft = (e) => { e.preventDefault(); moveLeft = true; };
-        const stopLeft = () => moveLeft = false;
-        const startRight = (e) => { e.preventDefault(); moveRight = true; };
-        const stopRight = () => moveRight = false;
-
-        bL.addEventListener('touchstart', startLeft);
-        bL.addEventListener('touchend', stopLeft);
-        bL.addEventListener('mousedown', startLeft);
-        window.addEventListener('mouseup', stopLeft);
-
-        bR.addEventListener('touchstart', startRight);
-        bR.addEventListener('touchend', stopRight);
-        bR.addEventListener('mousedown', startRight);
-        window.addEventListener('mouseup', stopRight);
-
-        function startGame() {
-            gameActive = true;
-            mainMenu.classList.add('hidden'); // Esconde o menu
-            scoreBox.style.opacity = "1";     // Mostra o score
-            controls.classList.remove('hidden'); // Mostra botões L/R
-            
-            gameLoop();
-        }
-
-        function gameLoop() {
-            if (!gameActive) return;
-
-            // Lógica de Movimento
-            if (moveLeft && player.x > 0) player.x -= player.speed;
-            if (moveRight && player.x < canvas.width - player.w) player.x += player.speed;
-
-            // Desenho
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Chão (Estrada Simples)
-            ctx.strokeStyle = "rgba(52, 152, 219, 0.3)";
-            ctx.setLineDash([20, 20]);
-            ctx.beginPath();
-            ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height);
-            ctx.stroke();
-
-            // Carro
-            ctx.fillStyle = "white";
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "var(--neon-blue)";
-            ctx.fillRect(player.x, player.y, player.w, player.h);
-            ctx.shadowBlur = 0;
-
-            requestAnimationFrame(gameLoop);
-        }
-    </script>
-</body>
-</html>
+    // Projeção 3D simples
+    function project(pX,
