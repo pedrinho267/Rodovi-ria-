@@ -15,9 +15,8 @@
             pointer-events: none; color: white;
         }
 
-        #score-box { font-size: 32px; font-weight: 900; margin-top: 20px; text-shadow: 0 0 10px var(--neon-blue); opacity: 0; z-index: 5; }
+        #score-box { font-size: 32px; font-weight: 900; margin-top: 20px; text-shadow: 0 0 10px var(--neon-blue); opacity: 0; z-index: 5; transition: 0.5s; }
 
-        /* Estilo dos Botões de Direção */
         #controls {
             position: absolute; bottom: 40px; width: 100%;
             display: flex; justify-content: space-between; padding: 0 30px;
@@ -31,6 +30,7 @@
             display: flex; align-items: center; justify-content: center;
             pointer-events: all; user-select: none;
             box-shadow: 0 0 15px var(--neon-blue);
+            -webkit-user-select: none;
         }
 
         .ctrl-btn:active { background: var(--neon-blue); transform: scale(0.9); }
@@ -45,4 +45,116 @@
         h1 { font-size: 48px; margin-bottom: 20px; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); }
         
         button.menu-btn {
-            padding: 15px 50px; font-size: 24px; font-
+            padding: 15px 50px; font-size: 24px; font-weight: bold; cursor: pointer;
+            background: transparent; border: 3px solid var(--neon-blue); color: white;
+            text-transform: uppercase; transition: 0.2s; box-shadow: 0 0 15px var(--neon-blue);
+            pointer-events: all;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="score-box">SCORE: <span id="score-val">0</span></div>
+        
+        <div id="controls" class="hidden">
+            <div class="ctrl-btn" id="btn-left">◀</div>
+            <div class="ctrl-btn" id="btn-right">▶</div>
+        </div>
+
+        <div id="main-menu" class="overlay">
+            <h1>TRAFFIC DRIVE</h1>
+            <button class="menu-btn" onclick="startGame()">JOGAR</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const mainMenu = document.getElementById('main-menu');
+        const scoreBox = document.getElementById('score-box');
+        const controls = document.getElementById('controls');
+
+        let gameActive = false;
+        let player = {
+            x: 0,
+            y: 0,
+            w: 50,
+            h: 90,
+            speed: 8
+        };
+
+        let moveLeft = false;
+        let moveRight = false;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = canvas.width / 2 - player.w / 2;
+            player.y = canvas.height - 150;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Configuração dos botões de direção
+        const bL = document.getElementById('btn-left');
+        const bR = document.getElementById('btn-right');
+
+        const startLeft = (e) => { e.preventDefault(); moveLeft = true; };
+        const stopLeft = () => moveLeft = false;
+        const startRight = (e) => { e.preventDefault(); moveRight = true; };
+        const stopRight = () => moveRight = false;
+
+        bL.addEventListener('touchstart', startLeft);
+        bL.addEventListener('touchend', stopLeft);
+        bL.addEventListener('mousedown', startLeft);
+        window.addEventListener('mouseup', stopLeft);
+
+        bR.addEventListener('touchstart', startRight);
+        bR.addEventListener('touchend', stopRight);
+        bR.addEventListener('mousedown', startRight);
+        window.addEventListener('mouseup', stopRight);
+
+        function startGame() {
+            gameActive = true;
+            mainMenu.classList.add('hidden'); // Esconde o menu
+            scoreBox.style.opacity = "1";     // Mostra o score
+            controls.classList.remove('hidden'); // Mostra botões L/R
+            
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            // Lógica de Movimento
+            if (moveLeft && player.x > 0) player.x -= player.speed;
+            if (moveRight && player.x < canvas.width - player.w) player.x += player.speed;
+
+            // Desenho
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Chão (Estrada Simples)
+            ctx.strokeStyle = "rgba(52, 152, 219, 0.3)";
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
+
+            // Carro
+            ctx.fillStyle = "white";
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "var(--neon-blue)";
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.shadowBlur = 0;
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
