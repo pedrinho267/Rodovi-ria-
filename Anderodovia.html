@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Highway City</title>
+    <title>Retro Highway Traffic</title>
     <style>
         :root { --neon-blue: #3498db; --neon-red: #e74c3c; }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
@@ -59,7 +59,7 @@
         <div id="score-box">SCORE: <span id="score-val">0</span></div>
         
         <div id="main-menu" class="overlay">
-            <h1>CITY TRAFFIC</h1>
+            <h1>TRAFFIC DRIVE</h1>
             <button onclick="startGame()">JOGAR</button>
         </div>
 
@@ -81,12 +81,15 @@
     
     let width, height, halfW, halfH;
     let gameState = 'MENU';
-    let score = 0, speed = 0, cameraZ = 0, spawnTimer = 0;
-    const INITIAL_SPEED = 18.0, ACCELERATION = 0.35;
+    let score = 0;
+    let speed = 0;
+    let cameraZ = 0;
+    let spawnTimer = 0;
+    const INITIAL_SPEED = 18.0;
+    const ACCELERATION = 0.35;
 
     const player = { x: 0, targetX: 0, lerpCoeff: 10 };
     let obstacles = [];
-    let scenery = []; // Para prédios e postes
     const keys = { left: false, right: false };
 
     function resize() {
@@ -99,9 +102,13 @@
 
     function startGame() {
         window.focus();
-        score = 0; speed = INITIAL_SPEED; cameraZ = 0;
-        player.x = 0; player.targetX = 0;
-        obstacles = []; scenery = []; spawnTimer = 0;
+        score = 0;
+        speed = INITIAL_SPEED;
+        cameraZ = 0;
+        player.x = 0;
+        player.targetX = 0;
+        obstacles = [];
+        spawnTimer = 0;
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('score-box').style.opacity = '1';
@@ -128,51 +135,35 @@
         };
     }
 
-    // --- DESENHO DO CENÁRIO ---
-
-    function drawBuilding(x, y, size, color) {
-        ctx.fillStyle = color;
-        // Corpo do prédio
-        ctx.fillRect(x - size/2, y - size * 3, size, size * 3);
-        // Janelas iluminadas
-        ctx.fillStyle = "#f1c40f";
-        for(let i = 1; i < 4; i++) {
-            for(let j = 1; j < 3; j++) {
-                if(Math.random() > 0.3) 
-                    ctx.fillRect(x - size/2 + (j*size/4), y - (i*size*0.7), size/10, size/10);
-            }
-        }
-    }
-
-    function drawStreetLight(x, y, size) {
-        ctx.strokeStyle = "#555";
-        ctx.lineWidth = size/10;
+    function drawSegmentLine(pStart, pEnd, thickness) {
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y - size * 1.5);
-        ctx.lineTo(x + (x < halfW ? size/2 : -size/2), y - size * 1.5);
-        ctx.stroke();
-        
-        // Brilho da lâmpada
-        let gradient = ctx.createRadialGradient(x + (x < halfW ? size/2 : -size/2), y - size * 1.5, 0, x + (x < halfW ? size/2 : -size/2), y - size * 1.5, size);
-        gradient.addColorStop(0, "rgba(255, 255, 200, 0.8)");
-        gradient.addColorStop(1, "rgba(255, 255, 200, 0)");
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(x + (x < halfW ? size/2 : -size/2), y - size * 1.5, size, 0, Math.PI * 2);
+        ctx.moveTo(pStart.x - thickness, pStart.y);
+        ctx.lineTo(pEnd.x - thickness, pEnd.y);
+        ctx.lineTo(pEnd.x + thickness, pEnd.y);
+        ctx.lineTo(pStart.x + thickness, pStart.y);
         ctx.fill();
     }
 
     function drawCar(x, y, size, color) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.fillStyle = "#111";
+        ctx.fillStyle = "#111"; // Rodas
         ctx.fillRect(-size/1.8, -size/1.5, size/4, size/3);
         ctx.fillRect(size/3, -size/1.5, size/4, size/3);
-        ctx.fillStyle = color;
+        ctx.fillStyle = color; // Corpo
         ctx.fillRect(-size/2, -size/2, size, size/2.5);
-        ctx.fillStyle = "#87ceeb";
+        ctx.fillStyle = "#87ceeb"; // Vidro
         ctx.fillRect(-size/3, -size/1.3, size/1.5, size/4);
+        ctx.restore();
+    }
+
+    function drawBus(x, y, size, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = color;
+        ctx.fillRect(-size/1.5, -size * 1.2, size * 1.3, size);
+        ctx.fillStyle = "#222"; // Janelas
+        ctx.fillRect(-size/1.8, -size * 1.1, size * 1.1, size/3);
         ctx.restore();
     }
 
@@ -186,85 +177,31 @@
 
         if (keys.left) player.targetX -= 4.5 * dt;
         if (keys.right) player.targetX += 4.5 * dt;
+        
         player.targetX = Math.max(-0.85, Math.min(0.85, player.targetX));
         player.x += (player.targetX - player.x) * (1 - Math.exp(-player.lerpCoeff * dt));
 
         spawnTimer += dt;
-        if (spawnTimer > 0.15) {
-            // Gerar carros
-            if (Math.random() > 0.8) {
-                obstacles.push({ x: [-0.7, 0, 0.7][Math.floor(Math.random()*3)], z: cameraZ + 80, type: 'CAR', color: `hsl(${Math.random() * 360}, 70%, 50%)` });
-            }
-            // Gerar cenário (prédios e postes)
-            if (Math.floor(cameraZ / 10) > Math.floor((cameraZ - speed*dt) / 10)) {
-                scenery.push({ x: -2.5, z: cameraZ + 100, type: 'BUILDING', color: '#333' });
-                scenery.push({ x: 2.5, z: cameraZ + 100, type: 'BUILDING', color: '#2c3e50' });
-                scenery.push({ x: -1.3, z: cameraZ + 100, type: 'LIGHT' });
-                scenery.push({ x: 1.3, z: cameraZ + 100, type: 'LIGHT' });
-            }
+        const spawnInterval = Math.max(0.15, 0.8 - (speed * 0.005)); 
+        if (spawnTimer > spawnInterval) {
+            const lanes = [-0.7, 0, 0.7];
+            const type = Math.random() > 0.75 ? 'BUS' : 'CAR';
+            obstacles.push({ 
+                x: lanes[Math.floor(Math.random()*3)], 
+                z: cameraZ + 80, 
+                type: type,
+                color: `hsl(${Math.random() * 360}, 70%, 50%)`
+            });
             spawnTimer = 0;
         }
 
-        obstacles.forEach((obs, i) => {
-            let dZ = obs.z - cameraZ;
-            if (dZ < 1.5 && dZ > -0.5 && Math.abs(player.x - obs.x) < 0.35) gameOver();
-            if (dZ < -5) obstacles.splice(i, 1);
-        });
-        scenery.forEach((s, i) => { if (s.z - cameraZ < -10) scenery.splice(i, 1); });
-    }
-
-    function draw() {
-        ctx.fillStyle = "#050510"; ctx.fillRect(0, 0, width, halfH); // Céu noturno
-        ctx.fillStyle = "#111"; ctx.fillRect(0, halfH, width, halfH); // Chão escuro
-
-        const roadWidth = 1.1;
-
-        // Desenhar Estrada
-        for (let i = 50; i > 0; i--) {
-            let z1 = Math.floor(cameraZ) + i;
-            let z2 = z1 - 1;
-            let p1 = project(-roadWidth, 0.5, z1), p2 = project(-roadWidth, 0.5, z2);
-            let p3 = project(roadWidth, 0.5, z2), p4 = project(roadWidth, 0.5, z1);
-
-            if (p1.w === 0) continue;
-            ctx.fillStyle = (z1 % 2 === 0) ? "#1a1a1a" : "#222";
-            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.fill();
-        }
-
-        // Desenhar Cenário (Prédios e Postes)
-        scenery.forEach(s => {
-            let p = project(s.x, 0.5, s.z);
-            if (p.w > 0) {
-                if (s.type === 'BUILDING') drawBuilding(p.x, p.y, p.w * 2, s.color);
-                else drawStreetLight(p.x, p.y, p.w * 0.8);
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            const obs = obstacles[i];
+            const distZ = obs.z - cameraZ;
+            
+            // Colisão refinada
+            if (distZ < 1.5 && distZ > -0.5) {
+                const hitWidth = obs.type === 'BUS' ? 0.45 : 0.35;
+                if (Math.abs(player.x - obs.x) < hitWidth) gameOver();
             }
-        });
-
-        // Desenhar Obstáculos
-        obstacles.forEach(obs => {
-            let p = project(obs.x, 0.5, obs.z);
-            if (p.w > 0) drawCar(p.x, p.y, p.w * 0.5, obs.color);
-        });
-
-        drawCar(halfW + (player.x * (width * 0.45)), height - 100, width * 0.18, "#3498db");
-    }
-
-    let lastTime = performance.now();
-    function gameLoop(now) {
-        update((now - lastTime) / 1000);
-        lastTime = now;
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    window.addEventListener('keydown', e => { if (e.key === "ArrowLeft") keys.left = true; if (e.key === "ArrowRight") keys.right = true; });
-    window.addEventListener('keyup', e => { if (e.key === "ArrowLeft") keys.left = false; if (e.key === "ArrowRight") keys.right = false; });
-    document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
-    document.getElementById('btnLeft').addEventListener('touchend', () => keys.left = false);
-    document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
-    document.getElementById('btnRight').addEventListener('touchend', () => keys.right = false);
-
-    requestAnimationFrame(gameLoop);
-</script>
-</body>
-</html>
+            if (distZ < -5) obstacles.splice
