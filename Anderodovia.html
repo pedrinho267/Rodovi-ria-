@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Highway Pro - Engine V2</title>
+    <title>Retro Drive - Centralizado</title>
     <style>
         :root { --neon: #00d2ff; --warn: #ff3e3e; }
         body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', monospace; }
@@ -37,46 +37,40 @@
 
     <div id="ui-layer">
         <div id="hud" class="hidden">
-            <div>DISTÂNCIA: <span id="dist-val" class="neon-text">0</span>m</div>
-            <div>VELOCIDADE: <span id="speed-val" class="neon-text">0</span>km/h</div>
+            <div>SCORE: <span id="dist-val" class="neon-text">0</span></div>
+            <div>SPEED: <span id="speed-val" class="neon-text">0</span>km/h</div>
         </div>
         
         <div id="main-menu" class="screen">
-            <h1 class="neon-text" style="font-size: 60px;">SUPER DRIVE</h1>
-            <button onclick="Game.start()">IGNIÇÃO</button>
+            <h1 class="neon-text" style="font-size: clamp(30px, 10vw, 60px);">RETRO DRIVE</h1>
+            <button onclick="Game.start()">START</button>
         </div>
 
         <div id="game-over" class="screen hidden">
-            <h1 style="color: var(--warn); font-size: 50px;">FATAL ERROR</h1>
+            <h1 style="color: var(--warn); font-size: 50px;">CRASH!</h1>
             <p id="final-stats" style="margin-bottom: 20px;"></p>
-            <button onclick="Game.start()" style="border-color: var(--warn); box-shadow: 0 0 10px var(--warn);">REINICIAR</button>
+            <button onclick="Game.start()" style="border-color: var(--warn); box-shadow: 0 0 10px var(--warn);">RETRY</button>
         </div>
     </div>
 
 <script>
-/**
- * ENGINE CORE: Pseudo-3D Rendering & Physics
- * Baseado no algoritmo de projeção de segmentos clássico.
- */
 const Game = {
-    // Boilerplate
     canvas: document.getElementById('gameCanvas'),
     ctx: null,
     dpr: window.devicePixelRatio || 1,
     
-    // Configurações de Mundo
+    // Configurações Técnicas
     fieldOfView: 100,
-    cameraHeight: 1000,
-    drawDistance: 300,
+    cameraHeight: 800,
+    drawDistance: 250,
     segmentLength: 200,
     roadWidth: 2000,
     
-    // Estado
     state: 'MENU',
     position: 0,
     speed: 0,
-    maxSpeed: 25000, // Unidades/seg
-    playerX: 0,
+    maxSpeed: 28000,
+    playerX: 0, // Agora 0 é o centro absoluto
     obstacles: [],
     
     init() {
@@ -93,13 +87,14 @@ const Game = {
         this.ctx.scale(this.dpr, this.dpr);
         this.screenW = window.innerWidth;
         this.screenH = window.innerHeight;
+        // Calcula profundidade baseada no FOV
         this.cameraDepth = 1 / Math.tan((this.fieldOfView / 2) * Math.PI / 180);
     },
 
     start() {
         this.state = 'PLAYING';
         this.position = 0;
-        this.speed = 1000;
+        this.speed = 1500;
         this.playerX = 0;
         this.obstacles = [];
         this.lastUpdateTime = performance.now();
@@ -108,96 +103,99 @@ const Game = {
         document.getElementById('hud').classList.remove('hidden');
     },
 
-    // Projeção 3D -> 2D
+    // Projeção Matemática 3D Centralizada
     project(pX, pY, pZ) {
         const relZ = pZ - this.position;
+        if (relZ <= 0) return { x: 0, y: 0, w: 0, scale: 0 };
+        
         const scale = this.cameraDepth / relZ;
         return {
-            x: (this.screenW / 2) + (scale * pX * this.screenW / 2),
+            // O centro da tela é o eixo de referência (this.screenW / 2)
+            x: (this.screenW / 2) + (scale * (pX - (this.playerX * this.roadWidth)) * this.screenW / 2),
             y: (this.screenH / 2) - (scale * (pY - this.cameraHeight) * this.screenH / 2),
-            w: scale * this.roadWidth * this.screenW / 2
+            w: scale * this.roadWidth * this.screenW / 2,
+            scale: scale
         };
     },
 
     update(dt) {
         if (this.state !== 'PLAYING') return;
 
-        // Física e Aceleração
-        const accel = 800;
-        this.speed = Math.min(this.speed + accel * dt, this.maxSpeed);
+        // Aceleração Progressiva
+        this.speed = Math.min(this.speed + 1200 * dt, this.maxSpeed);
         this.position += this.speed * dt;
 
-        // Input com suavização
-        const targetX = this.keys.left ? -1.2 : (this.keys.right ? 1.2 : 0);
-        this.playerX += (targetX - this.playerX) * 10 * dt;
+        // Controle Lateral
+        const step = 6 * dt;
+        if (this.keys.left) this.playerX -= step;
+        if (this.keys.right) this.playerX += step;
+        
+        // Limites da pista
+        this.playerX = Math.max(-0.9, Math.min(0.9, this.playerX));
 
-        // Spawn de Obstáculos (Baseado em distância, não tempo)
+        // Spawn de Pedras
         if (this.obstacles.length < 8) {
             const lastZ = this.obstacles.length ? this.obstacles[this.obstacles.length-1].z : this.position;
-            if (lastZ - this.position < 20000) {
+            if (lastZ - this.position < 15000) {
                 this.obstacles.push({
-                    x: (Math.random() * 2 - 1),
-                    z: lastZ + 5000 + Math.random() * 5000,
-                    w: 400
+                    x: (Math.random() * 1.6 - 0.8), // Spawn dentro da pista
+                    z: lastZ + 4000 + Math.random() * 6000
                 });
             }
         }
 
-        // Colisão e HUD
+        // HUD
         document.getElementById('dist-val').innerText = Math.floor(this.position / 100);
         document.getElementById('speed-val').innerText = Math.floor(this.speed / 100);
 
+        // Colisão
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const o = this.obstacles[i];
-            if (o.z < this.position) {
+            const relZ = o.z - this.position;
+            
+            if (relZ < 0) {
                 this.obstacles.splice(i, 1);
                 continue;
             }
             
-            // Colisão AABB Swept (simplificada para profundidade)
-            if (o.z - this.position < 250 && o.z - this.position > -250) {
-                const playerRealX = this.playerX * (this.roadWidth / 2);
-                const obstacleRealX = o.x * (this.roadWidth / 2);
-                if (Math.abs(playerRealX - obstacleRealX) < 600) {
-                    this.die();
+            // Verificação de Hitbox
+            if (relZ < 300 && relZ > 0) {
+                if (Math.abs(this.playerX - o.x) < 0.35) {
+                    this.state = 'GAMEOVER';
+                    document.getElementById('game-over').classList.remove('hidden');
+                    document.getElementById('final-stats').innerText = `SCORE FINAL: ${Math.floor(this.position / 100)}`;
                 }
             }
         }
     },
 
-    die() {
-        this.state = 'GAMEOVER';
-        document.getElementById('game-over').classList.remove('hidden');
-        document.getElementById('final-stats').innerText = `DISTÂNCIA PERCORRIDA: ${Math.floor(this.position / 100)}m`;
-    },
-
     draw() {
         const ctx = this.ctx;
+        
+        // Limpar Fundo (Céu)
         ctx.fillStyle = '#050510';
-        ctx.fillRect(0, 0, this.screenW, this.screenH);
-
-        // Horizonte
+        ctx.fillRect(0, 0, this.screenW, this.screenH / 2);
+        
+        // Grama/Chão
         ctx.fillStyle = '#0a0a20';
-        ctx.fillRect(0, this.screenH/2, this.screenW, this.screenH/2);
+        ctx.fillRect(0, this.screenH / 2, this.screenW, this.screenH / 2);
 
-        // Render Road Segments
+        // Renderização da Estrada por Segmentos
         const startPos = Math.floor(this.position / this.segmentLength) * this.segmentLength;
         
-        for (let n = 0; n < this.drawDistance; n++) {
-            const z1 = startPos + n * this.segmentLength;
+        for (let n = this.drawDistance; n > 0; n--) {
+            const z1 = startPos + (n - 1) * this.segmentLength;
             const z2 = z1 + this.segmentLength;
             
             const p1 = this.project(0, 0, z1);
             const p2 = this.project(0, 0, z2);
 
-            if (p1.y <= p2.y) continue;
+            if (p1.y <= p2.y || p1.scale <= 0) continue;
 
-            // Renderização em cores alternadas para percepção de velocidade
-            const color = (Math.floor(z1/this.segmentLength) % 2) ? '#222' : '#282828';
-            const line = (Math.floor(z1/this.segmentLength) % 2) ? '#00d2ff' : 'transparent';
-
-            // Road Body
-            ctx.fillStyle = color;
+            const isDark = (Math.floor(z1/this.segmentLength) % 2);
+            
+            // Corpo da Estrada
+            ctx.fillStyle = isDark ? '#222' : '#282828';
             ctx.beginPath();
             ctx.moveTo(p1.x - p1.w, p1.y);
             ctx.lineTo(p1.x + p1.w, p1.y);
@@ -205,51 +203,67 @@ const Game = {
             ctx.lineTo(p2.x - p2.w, p2.y);
             ctx.fill();
 
-            // Neon Borders
-            if (line !== 'transparent') {
-                ctx.strokeStyle = line;
-                ctx.lineWidth = 2;
-                ctx.stroke();
+            // Bordas Neon
+            ctx.strokeStyle = isDark ? '#00d2ff' : '#005f7a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Linha Central (opcional para feedback de velocidade)
+            if (!isDark) {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(p1.x - 2, p2.y, 4, p1.y - p2.y);
             }
         }
 
-        // Render Obstacles (Back to Front)
-        this.obstacles.slice().reverse().forEach(o => {
-            const p = this.project(o.x * this.roadWidth/2, 0, o.z);
-            if (p.y > this.screenH / 2 && p.y < this.screenH) {
-                ctx.fillStyle = '#ff3e3e';
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#ff3e3e';
-                ctx.fillRect(p.x - p.w/10, p.y - p.w/5, p.w/5, p.w/5);
-                ctx.shadowBlur = 0;
+        // Desenhar Pedras (Obstáculos)
+        this.obstacles.forEach(o => {
+            const p = this.project(o.x * this.roadWidth, 0, o.z);
+            if (p.scale > 0 && p.scale < 1) {
+                ctx.fillStyle = '#555';
+                ctx.beginPath();
+                ctx.moveTo(p.x - p.w/8, p.y);
+                ctx.lineTo(p.x, p.y - p.w/5);
+                ctx.lineTo(p.x + p.w/8, p.y);
+                ctx.fill();
             }
         });
 
-        // Render Player (Fixo no espaço de tela para menor latência)
-        const pSize = 120;
+        // Desenhar Carrinho do Jogador
+        const pSize = this.screenW * 0.15;
+        const pY = this.screenH - 100;
+        
+        // Sombra do carro
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillRect(this.screenW/2 - pSize/2, pY + 5, pSize, 10);
+
+        // Carro (centralizado na visualização)
         ctx.fillStyle = '#00d2ff';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = '#00d2ff';
-        const pX = (this.screenW / 2) + (this.playerX * this.screenW / 4);
-        ctx.fillRect(pX - pSize/2, this.screenH - 120, pSize, pSize/2);
+        ctx.fillRect(this.screenW/2 - pSize/2, pY - pSize/3, pSize, pSize/3);
         ctx.shadowBlur = 0;
+        
+        // Detalhe de Vidro
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(this.screenW/2 - pSize/3, pY - pSize/4, pSize/1.5, 5);
     },
 
     bindEvents() {
         this.keys = { left: false, right: false };
-        const handler = (val) => (e) => {
+        const keyHandler = (val) => (e) => {
             if (e.key === 'ArrowLeft') this.keys.left = val;
             if (e.key === 'ArrowRight') this.keys.right = val;
         };
-        window.addEventListener('keydown', handler(true));
-        window.addEventListener('keyup', handler(false));
+        window.addEventListener('keydown', keyHandler(true));
+        window.addEventListener('keyup', keyHandler(false));
         
-        // Touch
+        // Touch Controls
         this.canvas.addEventListener('touchstart', (e) => {
             const x = e.touches[0].clientX;
             if (x < this.screenW / 2) this.keys.left = true;
             else this.keys.right = true;
-        });
+            e.preventDefault();
+        }, {passive: false});
         this.canvas.addEventListener('touchend', () => {
             this.keys.left = false;
             this.keys.right = false;
@@ -258,7 +272,7 @@ const Game = {
 
     loop() {
         const now = performance.now();
-        const dt = Math.min((now - this.lastUpdateTime) / 1000, 0.1);
+        const dt = Math.min((now - (this.lastUpdateTime || now)) / 1000, 0.1);
         this.lastUpdateTime = now;
 
         this.update(dt);
