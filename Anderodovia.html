@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rodovia Retro Turbo</title>
+    <title>Retro Highway Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
         #ui { 
             position: absolute; top: 20px; width: 100%; 
-            color: white; text-align: center; font-size: 32px; font-weight: bold;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5); pointer-events: none; 
+            color: white; text-align: center; font-size: clamp(24px, 5vw, 40px); font-weight: 900;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.7); pointer-events: none; 
         }
         .instructions {
             position: absolute; bottom: 30px; width: 100%;
-            color: white; text-align: center; font-size: 16px; opacity: 0.7;
+            color: white; text-align: center; font-size: 14px; opacity: 0.6; letter-spacing: 2px;
         }
     </style>
 </head>
@@ -25,42 +25,185 @@
 
 <script>
     const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false }); // Otimização de performance
     const scoreElement = document.getElementById('score');
 
+    let width, height, halfW, halfH;
     function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        halfW = width / 2;
+        halfH = height / 2;
     }
     window.addEventListener('resize', resize);
     resize();
 
+    // Estado do Jogo
     let score = 0;
     let gameActive = true;
-    let speed = 0.08; 
+    let speed = 12.0; // Unidades por segundo
     let cameraZ = 0;
-
-    // Configuração do Jogador com interpolação
-    const player = {
-        x: 0,         // Posição atual
-        targetX: 0,   // Posição desejada
-        w: 0.3,
-        lerpSpeed: 0.15 // Suavidade do movimento (0 a 1)
-    };
-
+    let spawnTimer = 0;
+    const player = { x: 0, targetX: 0, lerpCoeff: 10 }; // Coeficiente de suavidade
     const obstacles = [];
     const keys = { left: false, right: false };
 
-    function spawnObstacle() {
-        if(!gameActive) return;
-        const lanes = [-0.6, 0, 0.6];
-        const lane = lanes[Math.floor(Math.random() * lanes.length)];
-        obstacles.push({ x: lane, z: cameraZ + 30, type: 'rock' });
-    }
-
-    setInterval(spawnObstacle, 800);
+    // Delta Time
+    let lastTime = performance.now();
 
     function project(pX, pY, pZ) {
         const perspective = 0.6;
-        const scale = perspective / (pZ - cameraZ);
-        const x = (canvas.width / 2) + (pX * scale * canvas.width);
+        const relativeZ = pZ - cameraZ;
+        if (relativeZ <= 0) return { x: 0, y: 0, w: 0 };
+        const scale = perspective / relativeZ;
+        return {
+            x: halfW + (pX * scale * width),
+            y: halfH + (pY * scale * height),
+            w: scale * width
+        };
+    }
+
+    function drawCar(x, y, size, isPlayer) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = "#111"; // Pneus
+        ctx.fillRect(-size/1.8, -size/1.5, size/4, size/3);
+        ctx.fillRect(size/3, -size/1.5, size/4, size/3);
+        ctx.fillStyle = isPlayer ? "#3498db" : "#e74c3c";
+        ctx.fillRect(-size/2, -size/2, size, size/2.5); // Corpo
+        ctx.fillStyle = "#87ceeb"; // Vidro
+        ctx.fillRect(-size/3, -size/1.3, size/1.5, size/4);
+        ctx.restore();
+    }
+
+    function drawRock(x, y, size) {
+        ctx.fillStyle = "#555";
+        ctx.beginPath();
+        ctx.moveTo(x - size/2, y);
+        ctx.lineTo(x - size/4, y - size*0.8);
+        ctx.lineTo(x + size/3, y - size);
+        ctx.lineTo(x + size/2, y);
+        ctx.fill();
+    }
+
+    function update(dt) {
+        if (!gameActive) return;
+
+        // Progressão
+        cameraZ += speed * dt;
+        speed += 0.05 * dt;
+        score += 10 * dt;
+        scoreElement.innerText = Math.floor(score);
+
+        // Entrada e Movimento Suave (Independente de Frame)
+        if (keys.left) player.targetX -= 4.0 * dt;
+        if (keys.right) player.targetX += 4.0 * dt;
+        player.targetX = Math.max(-0.8, Math.min(0.8, player.targetX));
+        
+        // Fórmula de Lerp Robusta para Delta Time
+        player.x += (player.targetX - player.x) * (1 - Math.exp(-player.lerpCoeff * dt));
+
+        // Spawn de obstáculos (Baseado em tempo, não em frames)
+        spawnTimer += dt;
+        if (spawnTimer > 0.8) {
+            const lanes = [-0.6, 0, 0.6];
+            obstacles.push({ x: lanes[Math.floor(Math.random()*3)], z: cameraZ + 40 });
+            spawnTimer = 0;
+        }
+
+        // Colisões e Limpeza
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            const obs = obstacles[i];
+            // Verifica colisão quando o objeto cruza o plano do jogador (z ~ 0.5)
+            const distZ = obs.z - cameraZ;
+            if (distZ < 0.4 && distZ > 0) {
+                if (Math.abs(player.x - obs.x) < 0.35) {
+                    gameActive = false;
+                    alert("GAME OVER! Score: " + Math.floor(score));
+                    location.reload();
+                }
+            }
+            if (distZ < -2) obstacles.splice(i, 1);
+        }
+    }
+
+    function draw() {
+        // Limpar fundo
+        ctx.fillStyle = "#1a1a2e";
+        ctx.fillRect(0, 0, width, halfH);
+        ctx.fillStyle = "#16a085";
+        ctx.fillRect(0, halfH, width, halfH);
+
+        // Estrada - Renderização Otimizada
+        const roadSegments = 35;
+        for (let i = roadSegments; i > 0; i--) {
+            const z1 = Math.floor(cameraZ) + i;
+            const z2 = z1 - 1;
+            const p1 = project(-1.2, 0.5, z1);
+            const p2 = project(-1.2, 0.5, z2);
+            const p3 = project(1.2, 0.5, z2);
+            const p4 = project(1.2, 0.5, z1);
+
+            if (p1.w === 0 || p2.w === 0) continue;
+
+            ctx.fillStyle = (z1 % 2 === 0) ? "#333" : "#393939";
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+            ctx.fill();
+
+            // Linha Central
+            if (z1 % 2 === 0) {
+                ctx.fillStyle = "#f1c40f";
+                const line = project(-0.02, 0.5, z1);
+                const lineNext = project(0.02, 0.5, z2);
+                ctx.fillRect(line.x, line.y, lineNext.x - line.x, 2);
+            }
+        }
+
+        // Objetos
+        obstacles.forEach(obs => {
+            const p = project(obs.x, 0.5, obs.z);
+            if (p.w > 2) drawRock(p.x, p.y, p.w * 0.7);
+        });
+
+        // Jogador (fixo na base da tela para reduzir latência visual)
+        const playerSize = width * 0.18;
+        const playerScreenX = halfW + (player.x * width * 0.45);
+        drawCar(playerScreenX, height - 60, playerSize, true);
+    }
+
+    function gameLoop(now) {
+        const dt = Math.min((now - lastTime) / 1000, 0.1); // Cap de 0.1 para evitar saltos gigantes
+        lastTime = now;
+
+        update(dt);
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Eventos de Toque (Mobile Pro)
+    canvas.addEventListener('touchstart', e => {
+        const x = e.touches[0].clientX;
+        if (x < halfW) keys.left = true; else keys.right = true;
+        e.preventDefault();
+    }, {passive: false});
+
+    canvas.addEventListener('touchend', () => {
+        keys.left = false; keys.right = false;
+    });
+
+    // Teclado
+    window.addEventListener('keydown', e => {
+        if (e.key === "ArrowLeft") keys.left = true;
+        if (e.key === "ArrowRight") keys.right = true;
+    });
+    window.addEventListener('keyup', e => {
+        if (e.key === "ArrowLeft") keys.left = false;
+        if (e.key === "ArrowRight") keys.right = false;
+    });
+
+    requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
