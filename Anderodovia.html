@@ -2,283 +2,240 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Night Highway Racer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midnight Highway Racer</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; margin: 0 auto; background: #2d5a27; } /* Grama de fundo */
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none;
         }
 
-        #game-container {
-            position: relative;
-            width: 800px;
-            height: 600px;
-            border: 4px solid #333;
-            background: #000;
-        }
-
-        canvas {
-            display: block;
-        }
-
-        /* Telas de UI */
         .overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
+            background: rgba(0,0,0,0.85); color: white; padding: 40px;
+            text-align: center; border-radius: 15px; border: 2px solid #5bc0de;
+            pointer-events: auto;
         }
-
-        h1 { font-size: 50px; color: #00d4ff; text-shadow: 0 0 15px #00d4ff; margin-bottom: 10px; }
-        p { font-size: 18px; margin-bottom: 20px; }
 
         button {
-            padding: 15px 40px;
-            font-size: 20px;
-            background: #ff4d4d;
-            border: none;
-            color: white;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: 0.3s;
+            background: #5bc0de; border: none; padding: 10px 30px;
+            font-size: 20px; color: white; cursor: pointer; border-radius: 5px;
+            margin-top: 20px; font-weight: bold;
         }
-
-        button:hover { background: #ff1a1a; transform: scale(1.1); }
 
         #hud {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #fff;
-            z-index: 5;
-            text-shadow: 2px 2px 5px #000;
+            position: absolute; top: 20px; left: 20px; color: white;
+            font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000;
         }
-
-        #game-over { display: none; }
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div id="hud">Score: 0</div>
-    
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="hud">Score: 0</div>
 
+<div id="ui-layer">
     <div id="menu" class="overlay">
-        <h1>CITY NIGHTS</h1>
-        <p>Use as SETAS para mover e desviar do trânsito!</p>
-        <button onclick="startGame()">INICIAR JOGO</button>
+        <h1>MIDNIGHT DRIVE</h1>
+        <p>Desvie do trânsito usando as Setas do Teclado</p>
+        <button onclick="startGame()">JOGAR</button>
     </div>
 
-    <div id="game-over" class="overlay">
-        <h1 style="color: #ff4d4d; text-shadow: 0 0 15px #ff4d4d;">GAME OVER</h1>
-        <p id="final-score">Pontos: 0</p>
+    <div id="game-over" class="overlay" style="display:none;">
+        <h1 style="color: #ff4d4d;">BATEU!</h1>
+        <p id="final-score">Score: 0</p>
         <button onclick="startGame()">TENTAR NOVAMENTE</button>
     </div>
 </div>
 
+<canvas id="gameCanvas"></canvas>
+
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const hud = document.getElementById('hud');
 const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
-const finalScoreText = document.getElementById('final-score');
+const scoreLabel = document.getElementById('hud');
 
-// Configurações do Jogo
-let speed = 0.02;
+// Configurações de perspectiva
+let width, height, horizon;
+let playerX = 0; // -1 a 1
+let roadOffset = 0;
 let score = 0;
-let isGameOver = true;
-let playerX = 0; // -1 (esquerda) a 1 (direita)
-let roadPosition = 0;
+let isRunning = false;
 let obstacles = [];
-let decoration = [];
+let scenery = [];
 
-// Teclado
-const keys = { Left: false, Right: false };
-window.addEventListener('keydown', e => {
-    if(e.key === "ArrowLeft") keys.Left = true;
-    if(e.key === "ArrowRight") keys.Right = true;
-});
-window.addEventListener('keyup', e => {
-    if(e.key === "ArrowLeft") keys.Left = false;
-    if(e.key === "ArrowRight") keys.Right = false;
-});
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    horizon = height * 0.45;
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+// Classes do Jogo
+class GameObject {
+    constructor(z, x, type) {
+        this.z = z; // Distância (0 a 1000)
+        this.x = x; // Posição horizontal
+        this.type = type;
+        this.width = type === 'bus' ? 0.6 : 0.4;
+    }
+}
 
 function startGame() {
     score = 0;
     playerX = 0;
-    roadPosition = 0;
+    roadOffset = 0;
     obstacles = [];
-    isGameOver = false;
-    speed = 0.02;
+    scenery = [];
+    isRunning = true;
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Gerar prédios e luzes fixas
-    decoration = [];
+    // Gerar prédios e postes iniciais
     for(let i = 0; i < 20; i++) {
-        decoration.push({ z: i * 0.1, side: i % 2 === 0 ? 1 : -1, type: i % 3 === 0 ? 'building' : 'light' });
+        addScenery(i * 50);
     }
     
-    requestAnimationFrame(gameLoop);
+    animate();
 }
 
-function update() {
-    if(isGameOver) return;
+function addScenery(z) {
+    const side = Math.random() > 0.5 ? 1.5 : -1.5;
+    const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
+    scenery.push({
+        z: z,
+        x: side,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        type: Math.random() > 0.3 ? 'building' : 'lamp'
+    });
+}
 
-    // Movimento lateral
-    if(keys.Left) playerX -= 0.03;
-    if(keys.Right) playerX += 0.03;
-    playerX = Math.max(-1.2, Math.min(1.2, playerX));
+const keys = {};
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
 
-    roadPosition += speed;
+function animate() {
+    if(!isRunning) return;
+
+    // Lógica
+    roadOffset += 10;
     score += 1;
-    hud.innerText = `Score: ${Math.floor(score/10)}`;
-    speed += 0.00001; // Aumenta dificuldade
+    scoreLabel.innerText = `Score: ${Math.floor(score/10)}`;
 
-    // Gerar obstáculos (Ônibus Vermelho)
-    if(Math.random() < 0.02) {
-        obstacles.push({
-            z: 2, // Longe no horizonte
-            x: (Math.random() * 2 - 1),
-            type: 'bus'
-        });
+    if(keys['ArrowLeft']) playerX -= 0.04;
+    if(keys['ArrowRight']) playerX += 0.04;
+    playerX = Math.max(-1, Math.min(1, playerX));
+
+    // Gerar tráfego
+    if(score % 60 === 0) {
+        obstacles.push(new GameObject(1000, (Math.random()*1.6)-0.8, Math.random() > 0.5 ? 'bus' : 'car'));
     }
 
-    // Atualizar obstáculos
-    for(let i = obstacles.length - 1; i >= 0; i--) {
-        obstacles[i].z -= speed;
+    render();
+    requestAnimationFrame(animate);
+}
 
-        // Detecção de Colisão
-        if(obstacles[i].z < 0.2 && obstacles[i].z > 0.05) {
-            if(Math.abs(obstacles[i].x - playerX) < 0.4) {
+function render() {
+    // 1. Céu e Fundo
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, width, horizon);
+    ctx.fillStyle = "#2d5a27"; // Grama
+    ctx.fillRect(0, horizon, width, height - horizon);
+
+    // 2. Estrada (Trapezóide)
+    ctx.fillStyle = "#333";
+    ctx.beginPath();
+    ctx.moveTo(width/2 - 20, horizon);
+    ctx.lineTo(width/2 + 20, horizon);
+    ctx.lineTo(width * 0.9, height);
+    ctx.lineTo(width * 0.1, height);
+    ctx.fill();
+
+    // Faixas da estrada
+    ctx.strokeStyle = "white";
+    ctx.setLineDash([20, 40]);
+    ctx.lineDashOffset = -roadOffset;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(width/2, horizon);
+    ctx.lineTo(width/2, height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 3. Renderizar Cenário e Obstáculos
+    const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
+
+    allObjects.forEach(obj => {
+        obj.z -= 10;
+        if(obj.z < 1) {
+            obj.z = 1000;
+            if(obj.type === 'building' || obj.type === 'lamp') return;
+        }
+
+        const scale = 30 / (obj.z || 1);
+        const xPos = width/2 + (obj.x - playerX) * scale * 100;
+        const yPos = horizon + (scale * 200);
+        const size = scale * 50;
+
+        if(obj.type === 'building') {
+            ctx.fillStyle = obj.color;
+            ctx.fillRect(xPos - size, yPos - size*3, size*2, size*3);
+            // Janelas
+            ctx.fillStyle = "#add8e6";
+            for(let i=0; i<3; i++) ctx.fillRect(xPos - size/2, yPos - size*(1+i), size/2, size/3);
+        } 
+        else if(obj.type === 'lamp') {
+            ctx.strokeStyle = "#888";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(xPos, yPos);
+            ctx.lineTo(xPos, yPos - size*2);
+            ctx.stroke();
+            // Brilho da luz
+            ctx.fillStyle = "rgba(255, 255, 180, 0.5)";
+            ctx.beginPath(); ctx.arc(xPos, yPos - size*2, size/2, 0, Math.PI*2); ctx.fill();
+        }
+        else if(obj.type === 'bus' || obj.type === 'car') {
+            // Desenhar Ônibus/Carro NPC
+            ctx.fillStyle = obj.type === 'bus' ? "#d9534f" : "#f0ad4e";
+            ctx.fillRect(xPos - size, yPos - size, size * 2, size);
+            
+            // Colisão
+            if(obj.z < 50 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.4) {
                 endGame();
             }
         }
-
-        if(obstacles[i].z < 0) obstacles.splice(i, 1);
-    }
-}
-
-function draw() {
-    // 1. Céu (Preto)
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 2. Grama (Verde Escuro)
-    ctx.fillStyle = "#1a3300";
-    ctx.fillRect(0, 300, canvas.width, 300);
-
-    // 3. Estrada (Perspectiva)
-    const horizon = 300;
-    const widthAtBottom = 600;
-    const widthAtTop = 20;
-
-    ctx.fillStyle = "#333";
-    ctx.beginPath();
-    ctx.moveTo(canvas.width/2 - widthAtTop, horizon);
-    ctx.lineTo(canvas.width/2 + widthAtTop, horizon);
-    ctx.lineTo(canvas.width/2 + widthAtBottom, canvas.height);
-    ctx.lineTo(canvas.width/2 - widthAtBottom, canvas.height);
-    ctx.fill();
-
-    // Linhas da Estrada
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    for(let i = 0; i < 10; i++) {
-        let z = ((i - roadPosition * 5) % 10 + 10) % 10 / 10;
-        let y = horizon + z * 300;
-        let w = z * 20;
-        if(y > horizon) {
-            ctx.beginPath();
-            ctx.moveTo(canvas.width/2, y);
-            ctx.lineTo(canvas.width/2, y + 20 * z);
-            ctx.stroke();
-        }
-    }
-
-    // 4. Desenhar Prédios e Postes (Decoração lateral)
-    decoration.forEach(obj => {
-        obj.z -= speed;
-        if(obj.z < 0) obj.z = 2;
-
-        let scale = 1 / obj.z;
-        let x = canvas.width/2 + (obj.side * 200 * scale);
-        let y = horizon + (100 * scale);
-        
-        if(obj.type === 'building') {
-            ctx.fillStyle = obj.side > 0 ? "#4a3b32" : "#2d4a3e";
-            ctx.fillRect(x - (30*scale), y - (150*scale), 60*scale, 150*scale);
-            // Janelas
-            ctx.fillStyle = "#add8e6";
-            ctx.fillRect(x - (10*scale), y - (120*scale), 10*scale, 10*scale);
-        } else {
-            // Poste de Luz
-            ctx.strokeStyle = "#777";
-            ctx.lineWidth = 5 * scale;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x, y - 80 * scale);
-            ctx.stroke();
-            // Brilho da lâmpada
-            ctx.fillStyle = "rgba(255, 255, 150, 0.6)";
-            ctx.beginPath();
-            ctx.arc(x, y - 80 * scale, 15 * scale, 0, Math.PI * 2);
-            ctx.fill();
-        }
     });
 
-    // 5. Obstáculos (Ônibus Vermelho)
-    obstacles.forEach(obs => {
-        let scale = 1 / obs.z;
-        let x = canvas.width/2 + (obs.x * 300 * scale);
-        let y = horizon + (250 * scale);
-        let w = 120 * scale;
-        let h = 80 * scale;
-
-        ctx.fillStyle = "#ff0000"; // Vermelho como na imagem
-        ctx.fillRect(x - w/2, y - h, w, h);
-        ctx.fillStyle = "#333"; // Vidros
-        ctx.fillRect(x - w/2 + 5, y - h + 5, w - 10, h/3);
-    });
-
-    // 6. Player (Carro Azul)
-    let pScale = 1 / 0.15;
-    let px = canvas.width/2 + (playerX * 300 * 0.15);
-    let py = canvas.height - 20;
-    ctx.fillStyle = "#00d4ff";
-    ctx.fillRect(px - 40, py - 60, 80, 50); // Corpo
-    ctx.fillStyle = "#000";
-    ctx.fillRect(px - 35, py - 55, 70, 20); // Vidro
+    // 4. Carro do Jogador (Azul)
+    const pSize = 80;
+    const px = width/2;
+    const py = height - 120;
+    
+    // Sombra
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(px - pSize/2, py + 40, pSize, 20);
+    // Corpo
+    ctx.fillStyle = "#5bc0de";
+    ctx.fillRect(px - pSize/2, py, pSize, 50);
+    ctx.fillStyle = "#333"; // Vidro
+    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, 15);
 }
 
 function endGame() {
-    isGameOver = true;
-    gameOverScreen.style.display = 'flex';
-    finalScoreText.innerText = `Pontuação Final: ${Math.floor(score/10)}`;
-}
-
-function gameLoop() {
-    update();
-    draw();
-    if(!isGameOver) requestAnimationFrame(gameLoop);
+    isRunning = false;
+    gameOverScreen.style.display = 'block';
+    document.getElementById('final-score').innerText = `Score Final: ${Math.floor(score/10)}`;
 }
 </script>
 
 </body>
-    </html>
+</html>
