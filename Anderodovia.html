@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Highway - Chill Drive</title>
+    <title>Midnight Highway - Ultra Slow Edition</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; margin: 0 auto; }
@@ -15,41 +15,41 @@
         }
 
         .overlay {
-            background: rgba(0,0,0,0.9); color: white; padding: 40px;
-            text-align: center; border-radius: 10px; border: 3px solid #0099ff;
-            pointer-events: auto; box-shadow: 0 0 20px #0099ff;
+            background: rgba(0,0,0,0.95); color: white; padding: 40px;
+            text-align: center; border-radius: 20px; border: 2px solid #5bc0de;
+            pointer-events: auto; box-shadow: 0 0 30px rgba(91, 192, 222, 0.3);
         }
 
         button {
-            background: #0099ff; border: none; padding: 12px 40px;
-            font-size: 22px; color: white; cursor: pointer; border-radius: 5px;
-            margin-top: 20px; font-weight: bold; transition: 0.3s;
+            background: #5bc0de; border: none; padding: 12px 40px;
+            font-size: 20px; color: white; cursor: pointer; border-radius: 8px;
+            margin-top: 20px; font-weight: bold; transition: 0.4s;
         }
 
-        button:hover { background: #007acc; transform: scale(1.05); }
+        button:hover { background: #31b0d5; letter-spacing: 2px; }
 
         #hud {
             position: absolute; top: 20px; left: 20px; color: #fff;
-            font-size: 28px; font-weight: bold; text-shadow: 2px 2px #000;
+            font-size: 24px; font-weight: 300; letter-spacing: 2px;
             z-index: 100;
         }
     </style>
 </head>
 <body>
 
-<div id="hud">Score: 0</div>
+<div id="hud">KM: 0</div>
 
 <div id="ui-layer">
     <div id="menu" class="overlay">
-        <h1 style="color: #0099ff;">CHILL HIGHWAY</h1>
-        <p>Use as SETAS para pilotar com calma</p>
-        <button onclick="startGame()">INICIAR PASSEIO</button>
+        <h1 style="color: #5bc0de; font-weight: 300;">SLOW DRIVE</h1>
+        <p>Um passeio tranquilo pela estrada noturna.</p>
+        <button onclick="startGame()">COMEÇAR PASSEIO</button>
     </div>
 
     <div id="game-over" class="overlay" style="display:none;">
-        <h1 style="color: #ff4d4d;">FIM DA LINHA</h1>
-        <p id="final-score">Score: 0</p>
-        <button onclick="startGame()">TENTAR DE NOVO</button>
+        <h1 style="color: #ff4d4d;">OPS!</h1>
+        <p id="final-score">Distância: 0</p>
+        <button onclick="startGame()">VOLTAR AO PASSEIO</button>
     </div>
 </div>
 
@@ -70,9 +70,9 @@ let isRunning = false;
 let obstacles = [];
 let scenery = [];
 
-// --- AJUSTES DE VELOCIDADE (MAIS LENTO AGORA) ---
-const GAME_SPEED = 12; 
-const PLAYER_SENSITIVITY = 0.04; 
+// --- VELOCIDADE ULTRA LENTA ---
+const GAME_SPEED = 4; 
+const PLAYER_SENSITIVITY = 0.025; 
 
 function resize() {
     width = window.innerWidth;
@@ -95,23 +95,23 @@ function startGame() {
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Gerar cenário lateral inicial (Fora da estrada)
-    for(let i = 0; i < 20; i++) {
-        addScenery(i * 70);
+    // Inicializa cenário lateral
+    for(let i = 0; i < 25; i++) {
+        addScenery(i * 60);
     }
     
     animate();
 }
 
 function addScenery(z) {
-    // x > 1.3 ou x < -1.3 (Garante distância da pista)
-    const side = Math.random() > 0.5 ? (1.5 + Math.random()) : (-1.5 - Math.random());
-    const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
+    // Prédios bem afastados da pista cinza
+    const side = Math.random() > 0.5 ? (1.6 + Math.random()) : (-1.6 - Math.random());
+    const colors = ['#3d2b1f', '#4a2424', '#1e332a', '#24243d'];
     scenery.push({
         z: z,
         x: side,
         color: colors[Math.floor(Math.random()*colors.length)],
-        type: Math.random() > 0.3 ? 'building' : 'lamp'
+        type: Math.random() > 0.4 ? 'building' : 'lamp'
     });
 }
 
@@ -123,19 +123,19 @@ function animate() {
     if(!isRunning) return;
 
     roadOffset += GAME_SPEED;
-    score += 1;
-    scoreLabel.innerText = `Score: ${Math.floor(score/5)}`;
+    score += 0.5;
+    scoreLabel.innerText = `KM: ${Math.floor(score/10)}`;
 
     if(keys['ArrowLeft']) playerX -= PLAYER_SENSITIVITY;
     if(keys['ArrowRight']) playerX += PLAYER_SENSITIVITY;
     playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    // Gerar tráfego na pista (x entre -0.8 e 0.8)
-    if(score % 80 === 0) { // Intervalo maior entre carros
+    // Gerar obstáculos raramente (estrada calma)
+    if(Math.floor(score) % 150 === 0) {
         obstacles.push({
             z: 1000, 
-            x: (Math.random() * 1.6) - 0.8, 
-            type: Math.random() > 0.4 ? 'car' : 'bus'
+            x: (Math.random() * 1.4) - 0.7, 
+            type: Math.random() > 0.3 ? 'car' : 'bus'
         });
     }
 
@@ -144,38 +144,41 @@ function animate() {
 }
 
 function render() {
-    // Fundo
+    // Céu
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, horizon);
-    ctx.fillStyle = "#152b00"; // Grama noturna
+    
+    // Grama muito escura
+    ctx.fillStyle = "#0d1a00";
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Estrada
-    ctx.fillStyle = "#222";
+    // Estrada Principal
+    ctx.fillStyle = "#1a1a1a";
     ctx.beginPath();
-    ctx.moveTo(width/2 - 30, horizon);
-    ctx.lineTo(width/2 + 30, horizon);
+    ctx.moveTo(width/2 - 25, horizon);
+    ctx.lineTo(width/2 + 25, horizon);
     ctx.lineTo(width * 1.2, height);
     ctx.lineTo(width * -0.2, height);
     ctx.fill();
 
-    // Faixas laterais
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 3;
+    // Faixas Laterais
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(width/2 - 30, horizon); ctx.lineTo(width * -0.15, height);
-    ctx.moveTo(width/2 + 30, horizon); ctx.lineTo(width * 1.15, height);
+    ctx.moveTo(width/2 - 25, horizon); ctx.lineTo(width * -0.15, height);
+    ctx.moveTo(width/2 + 25, horizon); ctx.lineTo(width * 1.15, height);
     ctx.stroke();
 
-    // Faixa central (animada)
-    ctx.setLineDash([20, 50]);
-    ctx.lineDashOffset = -roadOffset * 1.5;
+    // Faixa central lenta
+    ctx.setLineDash([15, 60]);
+    ctx.lineDashOffset = -roadOffset * 1.2;
     ctx.beginPath();
     ctx.moveTo(width/2, horizon);
     ctx.lineTo(width/2, height);
     ctx.stroke();
     ctx.setLineDash([]);
 
+    // Ordenar objetos por profundidade
     const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
 
     allObjects.forEach(obj => {
@@ -183,11 +186,11 @@ function render() {
         
         if(obj.z < 1) {
             obj.z = 1000;
-            if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.6) - 0.8;
+            if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.4) - 0.7;
             return;
         }
 
-        const scale = 40 / obj.z;
+        const scale = 35 / obj.z;
         const xPos = width/2 + (obj.x - playerX) * scale * 250;
         const yPos = horizon + (scale * 300);
         const size = scale * 80;
@@ -195,43 +198,43 @@ function render() {
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-            // Janelas
-            ctx.fillStyle = "#ffffaa";
-            ctx.fillRect(xPos - size/2, yPos - size*3.5, size/4, size/4);
+            // Janelas foscas
+            ctx.fillStyle = "rgba(255, 255, 150, 0.2)";
+            ctx.fillRect(xPos - size/2, yPos - size*3.5, size/5, size/5);
         } 
         else if(obj.type === 'lamp') {
-            ctx.fillStyle = "#666";
-            ctx.fillRect(xPos - 2, yPos - size*3, 4, size*3);
-            ctx.fillStyle = "rgba(255, 255, 0, 0.7)";
-            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#444";
+            ctx.fillRect(xPos - 1, yPos - size*3, 2, size*3);
+            ctx.fillStyle = "rgba(255, 255, 200, 0.4)";
+            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*12, 0, Math.PI*2); ctx.fill();
         }
         else {
-            // NPCs (Na pista)
-            ctx.fillStyle = obj.type === 'bus' ? "#d9534f" : "#f0ad4e";
+            // NPCs lentos
+            ctx.fillStyle = obj.type === 'bus' ? "#802b2b" : "#997300";
             ctx.fillRect(xPos - size/2, yPos - size/2, size, size/2);
             
-            // Colisão
-            if(obj.z < 60 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.35) {
+            // Colisão generosa (menos rigorosa por ser lento)
+            if(obj.z < 50 && obj.z > 15 && Math.abs(obj.x - playerX) < 0.3) {
                 endGame();
             }
         }
     });
 
     // Carro do Jogador (Azul)
-    const pSize = 100;
+    const pSize = 90;
     const px = width/2;
     const py = height - 100;
     
-    ctx.fillStyle = "#0099ff";
-    ctx.fillRect(px - pSize/2, py - 30, pSize, 40); 
-    ctx.fillStyle = "#333"; // Vidro
-    ctx.fillRect(px - pSize/2 + 10, py - 25, pSize - 20, 10);
+    ctx.fillStyle = "#0066aa"; // Azul mais sóbrio
+    ctx.fillRect(px - pSize/2, py - 20, pSize, 35); 
+    ctx.fillStyle = "#000"; // Vidro
+    ctx.fillRect(px - pSize/2 + 15, py - 15, pSize - 30, 8);
 }
 
 function endGame() {
     isRunning = false;
     gameOverScreen.style.display = 'block';
-    document.getElementById('final-score').innerText = `Pontos: ${Math.floor(score/5)}`;
+    document.getElementById('final-score').innerText = `Distância percorrida: ${Math.floor(score/10)} KM`;
 }
 </script>
 
