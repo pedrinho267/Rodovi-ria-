@@ -1,157 +1,255 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Night Highway Realism</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
-        #game-ui { position: absolute; bottom: 20px; width: 100%; text-align: center; color: white; font-family: 'Segoe UI', sans-serif; pointer-events: none; text-shadow: 2px 2px 5px #000; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jogo 3D Realista</title>
+
+<style>
+/* ===========================
+   RESET E BASE
+=========================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: black;
+    touch-action: none;
+    font-family: Arial, sans-serif;
+}
+
+/* ===========================
+   HUD
+=========================== */
+#hud {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: white;
+    z-index: 10;
+    font-size: 18px;
+}
+
+#gameover {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    z-index: 20;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+#gameover button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* ===========================
+   CANVAS
+=========================== */
+canvas {
+    display: block;
+}
+</style>
 </head>
 <body>
-    <div id="game-ui">WASD / SETAS PARA DIRIGIR | TOQUE NAS LATERAIS NO CELULAR</div>
 
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
+<div id="hud">Distância: <span id="score">0</span></div>
 
-    <script type="module">
-        import * as THREE from 'three';
+<div id="gameover">
+    <h1>Game Over</h1>
+    <button onclick="location.reload()">Reiniciar</button>
+</div>
 
-        // CONFIGURAÇÕES DE MOTOR (ZERO TRAVAS)
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
-        scene.fog = new THREE.FogExp2(0x000000, 0.015);
+<!-- ===========================
+     THREE.JS CDN
+=========================== -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.155/build/three.min.js"></script>
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.toneMapping = THREE.ReinhardToneMapping;
-        document.body.appendChild(renderer.domElement);
+<script>
+/* ===========================
+   CENA, CÂMERA, RENDER
+=========================== */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 10, 100);
 
-        // ILUMINAÇÃO GLOBAL
-        const ambient = new THREE.AmbientLight(0x404040, 0.5);
-        scene.add(ambient);
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
 
-        // ESTRADA REALISTA
-        const roadGroup = new THREE.Group();
-        const roadGeo = new THREE.PlaneGeometry(25, 1000);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        roadGroup.add(road);
+camera.position.set(0, 5, 10);
+camera.lookAt(0,0,0);
 
-        // LINHAS DA ESTRADA (Fiel à imagem)
-        const lineGeo = new THREE.PlaneGeometry(0.6, 10);
-        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        for(let i = 0; i < 50; i++) {
-            const l = new THREE.Mesh(lineGeo, lineMat);
-            l.rotation.x = -Math.PI / 2;
-            l.position.set(0, 0.02, -i * 20);
-            roadGroup.add(l);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+/* ===========================
+   LUZES (REALISMO)
+=========================== */
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+/* ===========================
+   CHÃO / ESTRADA
+=========================== */
+const roadGeo = new THREE.PlaneGeometry(6, 500);
+const roadMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+const road = new THREE.Mesh(roadGeo, roadMat);
+road.rotation.x = -Math.PI / 2;
+road.receiveShadow = true;
+scene.add(road);
+
+/* ===========================
+   LINHAS DA ESTRADA
+=========================== */
+function createLine(z) {
+    const geo = new THREE.BoxGeometry(0.2, 0.01, 2);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const line = new THREE.Mesh(geo, mat);
+    line.position.set(0, 0.02, z);
+    scene.add(line);
+    return line;
+}
+
+let lines = [];
+for (let i = 0; i < 50; i++) {
+    lines.push(createLine(-i * 5));
+}
+
+/* ===========================
+   CARRO DO JOGADOR
+=========================== */
+const playerGeo = new THREE.BoxGeometry(1, 0.5, 2);
+const playerMat = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+const player = new THREE.Mesh(playerGeo, playerMat);
+player.position.set(0, 0.25, 2);
+player.castShadow = true;
+scene.add(player);
+
+/* ===========================
+   INIMIGOS
+=========================== */
+const enemies = [];
+function spawnEnemy() {
+    const geo = new THREE.BoxGeometry(1, 0.5, 2);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xff3333 });
+    const enemy = new THREE.Mesh(geo, mat);
+    enemy.position.set(
+        (Math.random() * 4) - 2,
+        0.25,
+        -100
+    );
+    enemy.castShadow = true;
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+setInterval(spawnEnemy, 1500);
+
+/* ===========================
+   CONTROLES
+=========================== */
+let moveLeft = false;
+let moveRight = false;
+
+document.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") moveLeft = true;
+    if (e.key === "ArrowRight") moveRight = true;
+});
+
+document.addEventListener("keyup", e => {
+    if (e.key === "ArrowLeft") moveLeft = false;
+    if (e.key === "ArrowRight") moveRight = false;
+});
+
+document.addEventListener("touchstart", e => {
+    const x = e.touches[0].clientX;
+    if (x < window.innerWidth / 2) moveLeft = true;
+    else moveRight = true;
+});
+
+document.addEventListener("touchend", () => {
+    moveLeft = moveRight = false;
+});
+
+/* ===========================
+   GAME LOOP
+=========================== */
+let speed = 0.4;
+let score = 0;
+let gameOver = false;
+
+function animate() {
+    if (gameOver) return;
+
+    requestAnimationFrame(animate);
+
+    // Movimento jogador
+    if (moveLeft) player.position.x -= 0.1;
+    if (moveRight) player.position.x += 0.1;
+    player.position.x = THREE.MathUtils.clamp(player.position.x, -2.5, 2.5);
+
+    // Linhas
+    lines.forEach(line => {
+        line.position.z += speed * 5;
+        if (line.position.z > 10) line.position.z = -250;
+    });
+
+    // Inimigos
+    enemies.forEach(enemy => {
+        enemy.position.z += speed * 6;
+
+        // Colisão
+        if (
+            Math.abs(enemy.position.x - player.position.x) < 1 &&
+            Math.abs(enemy.position.z - player.position.z) < 1.5
+        ) {
+            gameOver = true;
+            document.getElementById("gameover").style.display = "flex";
         }
-        scene.add(roadGroup);
 
-        // PRÉDIOS E POSTES (Baseado na sua foto)
-        function createBuilding(x, z, color, h) {
-            const geo = new THREE.BoxGeometry(4, h, 4);
-            const mat = new THREE.MeshStandardMaterial({ color: color });
-            const b = new THREE.Mesh(geo, mat);
-            b.position.set(x, h/2, z);
-            scene.add(b);
+        if (enemy.position.z > 10) {
+            enemy.position.z = -100;
+            enemy.position.x = (Math.random() * 4) - 2;
         }
+    });
 
-        function createStreetLight(x, z) {
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 8), new THREE.MeshStandardMaterial({color: 0x555555}));
-            pole.position.set(x, 4, z);
-            scene.add(pole);
-            
-            const light = new THREE.PointLight(0xffffaa, 15, 30);
-            light.position.set(x, 8, z);
-            scene.add(light);
-            
-            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0xffffaa}));
-            bulb.position.set(x, 8, z);
-            scene.add(bulb);
-        }
+    score++;
+    document.getElementById("score").innerText = score;
 
-        // Gerar cenário lateral
-        for(let i = 0; i < 10; i++) {
-            createBuilding(-18, -i * 100, 0x8b7355, 15); // Prédio Marrom
-            createBuilding(18, -i * 100 - 50, 0x2e8b57, 20); // Prédio Verde
-            createStreetLight(-11, -i * 40);
-            createStreetLight(11, -i * 40);
-        }
+    renderer.render(scene, camera);
+}
 
-        // JOGADOR (Carro Azul da imagem)
-        const playerCar = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 4), new THREE.MeshStandardMaterial({color: 0x00aaff}));
-        body.position.y = 0.6;
-        playerCar.add(body);
-        const head1 = new THREE.SpotLight(0xffffff, 20, 40, 0.4);
-        head1.position.set(0, 0.5, -2);
-        playerCar.add(head1);
-        playerCar.add(head1.target);
-        head1.target.position.set(0, 0, -10);
-        scene.add(playerCar);
+animate();
 
-        // TRÁFEGO (Ônibus Vermelho e Carros)
-        const bus = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 8), new THREE.MeshStandardMaterial({color: 0xcc0000}));
-        bus.position.set(5, 1.5, -30);
-        scene.add(bus);
+/* ===========================
+   RESPONSIVO
+=========================== */
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 
-        // CONTROLES
-        const input = { left: false, right: false, up: false, down: false };
-        window.onkeydown = (e) => {
-            if(e.key === 'a' || e.key === 'ArrowLeft') input.left = true;
-            if(e.key === 'd' || e.key === 'ArrowRight') input.right = true;
-            if(e.key === 'w' || e.key === 'ArrowUp') input.up = true;
-        };
-        window.onkeyup = (e) => {
-            if(e.key === 'a' || e.key === 'ArrowLeft') input.left = false;
-            if(e.key === 'd' || e.key === 'ArrowRight') input.right = false;
-            if(e.key === 'w' || e.key === 'ArrowUp') input.up = false;
-        };
-
-        // Touch Mobile
-        window.ontouchstart = (e) => {
-            const x = e.touches[0].clientX;
-            if(x < window.innerWidth/2) input.left = true; else input.right = true;
-            input.up = true;
-        };
-        window.ontouchend = () => { input.left = false; input.right = false; };
-
-        // LOOP DE ANIMAÇÃO (100% FLUIDO)
-        let speed = 0;
-        function update() {
-            requestAnimationFrame(update);
-            
-            if(input.up) speed = THREE.MathUtils.lerp(speed, 1.2, 0.05);
-            else speed = THREE.MathUtils.lerp(speed, 0, 0.02);
-
-            if(input.left) playerCar.position.x -= 0.15;
-            if(input.right) playerCar.position.x += 0.15;
-
-            // Movimento Infinito
-            roadGroup.position.z += speed;
-            if(roadGroup.position.z > 20) roadGroup.position.z = 0;
-
-            // Câmera segue o carro
-            camera.position.set(playerCar.position.x, 5, playerCar.position.z + 12);
-            camera.lookAt(playerCar.position.x, 0, playerCar.position.z - 5);
-
-            renderer.render(scene, camera);
-        }
-
-        window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
-
-        update();
-    </script>
 </body>
 </html>
