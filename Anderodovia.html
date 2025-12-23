@@ -86,7 +86,7 @@
 
     const player = { x: 0, targetX: 0, lerpCoeff: 10 };
     let obstacles = [];
-    let scenery = []; // Para prédios e postes
+    let scenery = []; 
     const keys = { left: false, right: false };
 
     function resize() {
@@ -98,15 +98,24 @@
     resize();
 
     function startGame() {
-        window.focus();
-        score = 0; speed = INITIAL_SPEED; cameraZ = 0;
-        player.x = 0; player.targetX = 0;
-        obstacles = []; scenery = []; spawnTimer = 0;
+        // Reset de variáveis
+        score = 0; 
+        speed = INITIAL_SPEED; 
+        cameraZ = 0;
+        player.x = 0; 
+        player.targetX = 0;
+        obstacles = []; 
+        scenery = []; 
+        spawnTimer = 0;
+
+        // UI
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('score-box').style.opacity = '1';
         document.getElementById('controls').classList.remove('hidden');
+        
         gameState = 'PLAYING';
+        window.focus();
     }
 
     function gameOver() {
@@ -128,13 +137,9 @@
         };
     }
 
-    // --- DESENHO DO CENÁRIO ---
-
     function drawBuilding(x, y, size, color) {
         ctx.fillStyle = color;
-        // Corpo do prédio
         ctx.fillRect(x - size/2, y - size * 3, size, size * 3);
-        // Janelas iluminadas
         ctx.fillStyle = "#f1c40f";
         for(let i = 1; i < 4; i++) {
             for(let j = 1; j < 3; j++) {
@@ -152,15 +157,6 @@
         ctx.lineTo(x, y - size * 1.5);
         ctx.lineTo(x + (x < halfW ? size/2 : -size/2), y - size * 1.5);
         ctx.stroke();
-        
-        // Brilho da lâmpada
-        let gradient = ctx.createRadialGradient(x + (x < halfW ? size/2 : -size/2), y - size * 1.5, 0, x + (x < halfW ? size/2 : -size/2), y - size * 1.5, size);
-        gradient.addColorStop(0, "rgba(255, 255, 200, 0.8)");
-        gradient.addColorStop(1, "rgba(255, 255, 200, 0)");
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(x + (x < halfW ? size/2 : -size/2), y - size * 1.5, size, 0, Math.PI * 2);
-        ctx.fill();
     }
 
     function drawCar(x, y, size, color) {
@@ -191,11 +187,9 @@
 
         spawnTimer += dt;
         if (spawnTimer > 0.15) {
-            // Gerar carros
             if (Math.random() > 0.8) {
                 obstacles.push({ x: [-0.7, 0, 0.7][Math.floor(Math.random()*3)], z: cameraZ + 80, type: 'CAR', color: `hsl(${Math.random() * 360}, 70%, 50%)` });
             }
-            // Gerar cenário (prédios e postes)
             if (Math.floor(cameraZ / 10) > Math.floor((cameraZ - speed*dt) / 10)) {
                 scenery.push({ x: -2.5, z: cameraZ + 100, type: 'BUILDING', color: '#333' });
                 scenery.push({ x: 2.5, z: cameraZ + 100, type: 'BUILDING', color: '#2c3e50' });
@@ -205,33 +199,31 @@
             spawnTimer = 0;
         }
 
-        obstacles.forEach((obs, i) => {
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
             let dZ = obs.z - cameraZ;
             if (dZ < 1.5 && dZ > -0.5 && Math.abs(player.x - obs.x) < 0.35) gameOver();
             if (dZ < -5) obstacles.splice(i, 1);
-        });
-        scenery.forEach((s, i) => { if (s.z - cameraZ < -10) scenery.splice(i, 1); });
+        }
+        scenery = scenery.filter(s => s.z - cameraZ > -10);
     }
 
     function draw() {
-        ctx.fillStyle = "#050510"; ctx.fillRect(0, 0, width, halfH); // Céu noturno
-        ctx.fillStyle = "#111"; ctx.fillRect(0, halfH, width, halfH); // Chão escuro
+        ctx.fillStyle = "#050510"; ctx.fillRect(0, 0, width, halfH); 
+        ctx.fillStyle = "#111"; ctx.fillRect(0, halfH, width, halfH); 
 
         const roadWidth = 1.1;
 
-        // Desenhar Estrada
         for (let i = 50; i > 0; i--) {
             let z1 = Math.floor(cameraZ) + i;
             let z2 = z1 - 1;
             let p1 = project(-roadWidth, 0.5, z1), p2 = project(-roadWidth, 0.5, z2);
             let p3 = project(roadWidth, 0.5, z2), p4 = project(roadWidth, 0.5, z1);
-
             if (p1.w === 0) continue;
             ctx.fillStyle = (z1 % 2 === 0) ? "#1a1a1a" : "#222";
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.fill();
         }
 
-        // Desenhar Cenário (Prédios e Postes)
         scenery.forEach(s => {
             let p = project(s.x, 0.5, s.z);
             if (p.w > 0) {
@@ -240,30 +232,37 @@
             }
         });
 
-        // Desenhar Obstáculos
         obstacles.forEach(obs => {
             let p = project(obs.x, 0.5, obs.z);
             if (p.w > 0) drawCar(p.x, p.y, p.w * 0.5, obs.color);
         });
 
-        drawCar(halfW + (player.x * (width * 0.45)), height - 100, width * 0.18, "#3498db");
+        if(gameState !== 'MENU') {
+            drawCar(halfW + (player.x * (width * 0.45)), height - 100, width * 0.18, "#3498db");
+        }
     }
 
     let lastTime = performance.now();
     function gameLoop(now) {
-        update((now - lastTime) / 1000);
+        let dt = (now - lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1; 
         lastTime = now;
+        
+        update(dt);
         draw();
         requestAnimationFrame(gameLoop);
     }
 
+    // Input Listeners
     window.addEventListener('keydown', e => { if (e.key === "ArrowLeft") keys.left = true; if (e.key === "ArrowRight") keys.right = true; });
     window.addEventListener('keyup', e => { if (e.key === "ArrowLeft") keys.left = false; if (e.key === "ArrowRight") keys.right = false; });
+    
     document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
     document.getElementById('btnLeft').addEventListener('touchend', () => keys.left = false);
     document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
     document.getElementById('btnRight').addEventListener('touchend', () => keys.right = false);
 
+    // Iniciar Motor do Jogo
     requestAnimationFrame(gameLoop);
 </script>
 </body>
