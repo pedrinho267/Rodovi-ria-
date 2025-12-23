@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Drive 3D - Fiel à Foto</title>
+    <title>3D Day Drive</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #00ff00; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #000; }
-        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: white; font-size: 12px; opacity: 0.5; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #555; }
+        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: #444; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -18,102 +18,109 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
-        scene.fog = new THREE.Fog(0x000000, 20, 100);
+        scene.background = new THREE.Color(0x87CEEB); // Azul Céu
+        scene.fog = new THREE.Fog(0x87CEEB, 40, 120); // Neblina clara para o horizonte
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Ativa sombras
         document.body.appendChild(renderer.domElement);
 
-        // --- AMBIENTE (ESTRADA E GRAMA) ---
+        // --- AMBIENTE DE DIA ---
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
         function createFloor() {
-            const planeGeo = new THREE.PlaneGeometry(100, 200);
-            const planeMat = new THREE.MeshPhongMaterial({ color: 0x003300 }); // Grama verde escuro
+            // Grama mais clara
+            const planeGeo = new THREE.PlaneGeometry(200, 400);
+            const planeMat = new THREE.MeshPhongMaterial({ color: 0x228B22 }); 
             const floor = new THREE.Mesh(planeGeo, planeMat);
             floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
             worldGroup.add(floor);
 
-            // Asfalto
-            const roadGeo = new THREE.PlaneGeometry(14, 200);
-            const roadMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            // Asfalto cinza
+            const roadGeo = new THREE.PlaneGeometry(14, 400);
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
             const road = new THREE.Mesh(roadGeo, roadMat);
             road.position.y = 0.01;
             floor.add(road);
 
-            // Faixas centrais azuis (detalhe da sua foto)
-            const blueLineGeo = new THREE.PlaneGeometry(0.3, 200);
-            const blueLineMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            // Linhas brancas laterais e central azul
+            const blueLineGeo = new THREE.PlaneGeometry(0.3, 400);
+            const blueLineMat = new THREE.MeshBasicMaterial({ color: 0x0055ff });
             const line1 = new THREE.Mesh(blueLineGeo, blueLineMat);
             line1.position.set(-0.5, 0.02, 0);
             floor.add(line1);
+            
             const line2 = new THREE.Mesh(blueLineGeo, blueLineMat);
             line2.position.set(0.5, 0.02, 0);
             floor.add(line2);
             
-            // Faixas brancas pontilhadas
-            for(let i = -100; i < 100; i += 10) {
-                const stripeGeo = new THREE.PlaneGeometry(0.5, 5);
-                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const s = new THREE.Mesh(stripeGeo, stripeMat);
+            for(let i = -200; i < 200; i += 15) {
+                const sGeo = new THREE.PlaneGeometry(0.5, 6);
+                const sMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const s = new THREE.Mesh(sGeo, sMat);
                 s.position.set(0, 0.03, i);
                 floor.add(s);
             }
         }
         createFloor();
 
-        // --- POSTES DE LUZ (IGUAL À FOTO) ---
-        function createStreetLight(z) {
-            const pole = new THREE.Group();
-            const stick = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
-            stick.position.y = 4;
-            pole.add(stick);
-
-            const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
-            arm.position.set(-1, 8, 0);
-            pole.add(arm);
-
-            const light = new THREE.PointLight(0xffffaa, 5, 15);
-            light.position.set(-2, 7.5, 0);
-            pole.add(light);
-
-            pole.position.set(8, 0, z);
-            worldGroup.add(pole);
-        }
-
-        for(let i = 0; i > -200; i -= 30) {
-            createStreetLight(i);
-            createStreetLight(i + 15);
-        }
+        // --- ILUMINAÇÃO SOLAR ---
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+        sun.position.set(10, 20, 10);
+        sun.castShadow = true;
+        scene.add(sun);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
         // --- JOGADOR (CARRO AZUL) ---
         const player = new THREE.Group();
         const carBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 2.2), new THREE.MeshPhongMaterial({color: 0x00ccff}));
         carBody.position.y = 0.5;
+        carBody.castShadow = true;
         player.add(carBody);
         scene.add(player);
         player.position.set(-3, 0, 10);
 
-        // --- INIMIGOS E OBSTÁCULOS ---
+        // --- OBSTÁCULOS ---
         const obstacles = [];
         function spawnEnemy() {
             const isBus = Math.random() > 0.7;
-            const color = isBus ? 0xff0000 : (Math.random() > 0.5 ? 0xffff00 : 0xff00ff);
+            const color = isBus ? 0xcc0000 : (Math.random() > 0.5 ? 0xffcc00 : 0xff00ff);
             const geo = isBus ? new THREE.BoxGeometry(1.5, 1.5, 5) : new THREE.BoxGeometry(1.2, 0.7, 2.2);
             const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color: color}));
+            mesh.castShadow = true;
             
             const lane = (Math.floor(Math.random() * 2) === 0) ? -3.5 : 3.5;
-            mesh.position.set(lane, isBus ? 0.75 : 0.5, -80);
+            mesh.position.set(lane, isBus ? 0.75 : 0.5, -100);
             scene.add(mesh);
             obstacles.push(mesh);
         }
 
-        // --- LÓGICA ---
+        // --- PRÉDIOS DIA ---
+        const buildings = [];
+        function spawnBuilding(z, side) {
+            const h = 10 + Math.random() * 15;
+            const geo = new THREE.BoxGeometry(4, h, 4);
+            const colors = [0xaaaaaa, 0xbbbbbb, 0x888888, 0x9999ff];
+            const mat = new THREE.MeshPhongMaterial({color: colors[Math.floor(Math.random()*colors.length)]});
+            const b = new THREE.Mesh(geo, mat);
+            b.position.set(side * 15, h/2, z);
+            b.castShadow = true;
+            worldGroup.add(b);
+            buildings.push(b);
+        }
+
+        for(let i = 0; i > -200; i -= 20) {
+            spawnBuilding(i, 1);
+            spawnBuilding(i, -1);
+        }
+
+        // --- LÓGICA DE MOVIMENTO ---
         let score = 0;
-        let speed = 0.8;
+        let speed = 1.0;
         const keys = { left: false, right: false };
 
         window.onkeydown = (e) => { 
@@ -125,7 +132,6 @@
             if(e.code == "ArrowRight") keys.right = false;
         };
 
-        // Mobile
         window.ontouchstart = (e) => {
             if(e.touches[0].clientX < window.innerWidth/2) keys.left = true;
             else keys.right = true;
@@ -135,19 +141,4 @@
         function update() {
             requestAnimationFrame(update);
 
-            // Movimento do mundo (Loop infinito)
             worldGroup.position.z += speed;
-            if(worldGroup.position.z > 50) worldGroup.position.z = 0;
-
-            // Movimento Jogador
-            if(keys.left && player.position.x > -5) player.position.x -= 0.2;
-            if(keys.right && player.position.x < 5) player.position.x += 0.2;
-
-            // Obstáculos
-            if(Math.random() < 0.03) spawnEnemy();
-            
-            obstacles.forEach((obj, i) => {
-                obj.position.z += speed;
-                
-                // Colisão
-                const
