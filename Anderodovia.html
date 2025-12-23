@@ -154,13 +154,16 @@
 
         if (keys.left) player.targetX -= 4.0 * dt;
         if (keys.right) player.targetX += 4.0 * dt;
-        player.targetX = Math.max(-0.6, Math.min(0.6, player.targetX));
+        
+        // Limite lateral da pista ajustado para a nova largura
+        player.targetX = Math.max(-0.9, Math.min(0.9, player.targetX));
         player.x += (player.targetX - player.x) * (1 - Math.exp(-player.lerpCoeff * dt));
 
         spawnTimer += dt;
         const spawnInterval = Math.max(0.2, 0.8 - (speed * 0.01)); 
         if (spawnTimer > spawnInterval) {
-            const lanes = [-0.45, 0, 0.45];
+            // Lógica de 3 faixas espalhadas na pista larga
+            const lanes = [-0.7, 0, 0.7];
             obstacles.push({ x: lanes[Math.floor(Math.random()*3)], z: cameraZ + 60 });
             spawnTimer = 0;
         }
@@ -168,23 +171,22 @@
         for (let i = obstacles.length - 1; i >= 0; i--) {
             const obs = obstacles[i];
             const distZ = obs.z - cameraZ;
+            // Colisão ajustada para pedra menor
             if (distZ < 0.5 && distZ > 0) {
-                if (Math.abs(player.x - obs.x) < 0.3) gameOver();
+                if (Math.abs(player.x - obs.x) < 0.25) gameOver();
             }
             if (distZ < -2) obstacles.splice(i, 1);
         }
     }
 
     function draw() {
-        // 1. Céu e Horizonte
         ctx.fillStyle = "#0c0c1e";
         ctx.fillRect(0, 0, width, halfH);
         ctx.fillStyle = "#1e392a";
         ctx.fillRect(0, halfH, width, halfH);
 
-        // 2. Estrada
         const segments = 50;
-        const roadWidth = 0.8;
+        const roadWidth = 1.2; // ESTRADA MAIS GROSSA
 
         for (let i = segments; i > 0; i--) {
             const z1 = Math.floor(cameraZ) + i;
@@ -197,19 +199,16 @@
 
             if (p1.w === 0 || p2.w === 0) continue;
 
-            // Asfalto
             ctx.fillStyle = (z1 % 2 === 0) ? "#222" : "#282828";
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
             ctx.fill();
 
-            // Bordas Brancas
             ctx.fillStyle = "#fff";
             drawSegmentLine(p1, p2, p1.w * 0.04);
             drawSegmentLine(p4, p3, p1.w * 0.04);
 
-            // Linha Central Amarela
             if (z1 % 2 === 0) {
                 ctx.fillStyle = "#f1c40f";
                 const m1 = project(0, 0.5, z1);
@@ -218,13 +217,11 @@
             }
         }
 
-        // 3. Obstáculos
         obstacles.forEach(obs => {
             const p = project(obs.x, 0.5, obs.z);
-            if (p.w > 1 && p.y > halfH) drawRock(p.x, p.y, p.w * 0.7);
+            if (p.w > 1 && p.y > halfH) drawRock(p.x, p.y, p.w * 0.4); // PEDRA MENOR
         });
 
-        // 4. Carro do Jogador
         const playerSize = width * 0.15;
         const playerScreenX = halfW + (player.x * (width * 0.4));
         drawCar(playerScreenX, height - 80, playerSize, true);
@@ -239,7 +236,6 @@
         requestAnimationFrame(gameLoop);
     }
 
-    // Input
     const handleInput = (x, isDown) => {
         if (gameState !== 'PLAYING') return;
         if (isDown) { if (x < halfW) keys.left = true; else keys.right = true; }
