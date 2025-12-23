@@ -81,15 +81,12 @@
     
     let width, height, halfW, halfH;
     let gameState = 'MENU';
-    let score = 0;
-    let speed = 0;
-    let cameraZ = 0;
-    let spawnTimer = 0;
-    const INITIAL_SPEED = 18.0;
-    const ACCELERATION = 0.35;
+    let score = 0, speed = 0, cameraZ = 0, spawnTimer = 0;
+    const INITIAL_SPEED = 18.0, ACCELERATION = 0.35;
 
     const player = { x: 0, targetX: 0, lerpCoeff: 10 };
     let obstacles = [];
+    let scenery = []; 
     const keys = { left: false, right: false };
 
     function resize() {
@@ -101,14 +98,9 @@
     resize();
 
     function startGame() {
-        window.focus();
-        score = 0;
-        speed = INITIAL_SPEED;
-        cameraZ = 0;
-        player.x = 0;
-        player.targetX = 0;
-        obstacles = [];
-        spawnTimer = 0;
+        score = 0; speed = INITIAL_SPEED; cameraZ = 0;
+        player.x = 0; player.targetX = 0;
+        obstacles = []; scenery = []; spawnTimer = 0;
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('score-box').style.opacity = '1';
@@ -135,34 +127,49 @@
         };
     }
 
-    function drawSegmentLine(pStart, pEnd, thickness) {
+    // --- DESENHO DO CENÁRIO ---
+    function drawBuilding(x, y, size, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x - size/2, y - size * 3, size, size * 3);
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - size/2, y - size * 3, size, size * 3);
+        // Janelas
+        ctx.fillStyle = "#add8e6";
+        let winSize = size / 4;
+        for(let i = 1; i < 4; i++) {
+            for(let j = 0; j < 2; j++) {
+                ctx.fillRect(x - size/2.5 + (j*size/2), y - (i*size*0.7), winSize, winSize);
+            }
+        }
+    }
+
+    function drawStreetLight(x, y, size) {
+        ctx.fillStyle = "#777";
+        ctx.fillRect(x - size/10, y - size * 1.5, size/5, size * 1.5);
+        ctx.fillStyle = "#ffffaa";
         ctx.beginPath();
-        ctx.moveTo(pStart.x - thickness, pStart.y);
-        ctx.lineTo(pEnd.x - thickness, pEnd.y);
-        ctx.lineTo(pEnd.x + thickness, pEnd.y);
-        ctx.lineTo(pStart.x + thickness, pStart.y);
+        ctx.arc(x, y - size * 1.5, size/3, 0, Math.PI * 2);
         ctx.fill();
     }
 
     function drawCar(x, y, size, color) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.fillStyle = "#111"; // Rodas
+        ctx.save(); ctx.translate(x, y);
+        ctx.fillStyle = "#111";
         ctx.fillRect(-size/1.8, -size/1.5, size/4, size/3);
         ctx.fillRect(size/3, -size/1.5, size/4, size/3);
-        ctx.fillStyle = color; // Corpo
+        ctx.fillStyle = color;
         ctx.fillRect(-size/2, -size/2, size, size/2.5);
-        ctx.fillStyle = "#87ceeb"; // Vidro
+        ctx.fillStyle = "#87ceeb";
         ctx.fillRect(-size/3, -size/1.3, size/1.5, size/4);
         ctx.restore();
     }
 
     function drawBus(x, y, size, color) {
-        ctx.save();
-        ctx.translate(x, y);
+        ctx.save(); ctx.translate(x, y);
         ctx.fillStyle = color;
         ctx.fillRect(-size/1.5, -size * 1.2, size * 1.3, size);
-        ctx.fillStyle = "#222"; // Janelas
+        ctx.fillStyle = "#222";
         ctx.fillRect(-size/1.8, -size * 1.1, size * 1.1, size/3);
         ctx.restore();
     }
@@ -177,31 +184,99 @@
 
         if (keys.left) player.targetX -= 4.5 * dt;
         if (keys.right) player.targetX += 4.5 * dt;
-        
         player.targetX = Math.max(-0.85, Math.min(0.85, player.targetX));
         player.x += (player.targetX - player.x) * (1 - Math.exp(-player.lerpCoeff * dt));
 
         spawnTimer += dt;
-        const spawnInterval = Math.max(0.15, 0.8 - (speed * 0.005)); 
-        if (spawnTimer > spawnInterval) {
-            const lanes = [-0.7, 0, 0.7];
-            const type = Math.random() > 0.75 ? 'BUS' : 'CAR';
-            obstacles.push({ 
-                x: lanes[Math.floor(Math.random()*3)], 
-                z: cameraZ + 80, 
-                type: type,
-                color: `hsl(${Math.random() * 360}, 70%, 50%)`
-            });
+        if (spawnTimer > 0.15) {
+            if (Math.random() > 0.85) {
+                const type = Math.random() > 0.8 ? 'BUS' : 'CAR';
+                obstacles.push({ x: [-0.7, 0, 0.7][Math.floor(Math.random()*3)], z: cameraZ + 100, type: type, color: `hsl(${Math.random() * 360}, 70%, 50%)` });
+            }
+            if (Math.floor(cameraZ / 20) > Math.floor((cameraZ - speed*dt) / 20)) {
+                scenery.push({ x: -2.5, z: cameraZ + 120, type: 'BUILDING', color: `hsl(${Math.random() * 360}, 30%, 40%)` });
+                scenery.push({ x: 2.5, z: cameraZ + 120, type: 'BUILDING', color: `hsl(${Math.random() * 360}, 30%, 40%)` });
+                scenery.push({ x: -1.4, z: cameraZ + 120, type: 'LIGHT' });
+                scenery.push({ x: 1.4, z: cameraZ + 120, type: 'LIGHT' });
+            }
             spawnTimer = 0;
         }
 
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            const obs = obstacles[i];
-            const distZ = obs.z - cameraZ;
-            
-            // Colisão refinada
-            if (distZ < 1.5 && distZ > -0.5) {
-                const hitWidth = obs.type === 'BUS' ? 0.45 : 0.35;
-                if (Math.abs(player.x - obs.x) < hitWidth) gameOver();
+        obstacles.forEach((obs, i) => {
+            let dZ = obs.z - cameraZ;
+            if (dZ < 1.5 && dZ > -0.5 && Math.abs(player.x - obs.x) < 0.35) gameOver();
+            if (dZ < -5) obstacles.splice(i, 1);
+        });
+        scenery = scenery.filter(s => s.z - cameraZ > -10);
+    }
+
+    function draw() {
+        // Céu e Grama
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, width, halfH); 
+        ctx.fillStyle = "#228b22"; ctx.fillRect(0, halfH, width, halfH); 
+
+        const roadWidth = 1.2;
+
+        // Estrada
+        for (let i = 60; i > 0; i--) {
+            let z1 = Math.floor(cameraZ) + i;
+            let z2 = z1 - 1;
+            let p1 = project(-roadWidth, 0.5, z1), p2 = project(-roadWidth, 0.5, z2);
+            let p3 = project(roadWidth, 0.5, z2), p4 = project(roadWidth, 0.5, z1);
+
+            if (p1.w === 0) continue;
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.fill();
+
+            // Faixas brancas
+            if (z1 % 4 === 0) {
+                let f1 = project(-0.05, 0.5, z1), f2 = project(-0.05, 0.5, z2);
+                let f3 = project(0.05, 0.5, z2), f4 = project(0.05, 0.5, z1);
+                ctx.fillStyle = "#fff";
+                ctx.beginPath(); ctx.moveTo(f1.x, f1.y); ctx.lineTo(f2.x, f2.y); ctx.lineTo(f3.x, f3.y); ctx.lineTo(f4.x, f4.y); ctx.fill();
             }
-            if (distZ < -5) obstacles.splice
+        }
+
+        // Cenário
+        scenery.forEach(s => {
+            let p = project(s.x, 0.5, s.z);
+            if (p.w > 0) {
+                if (s.type === 'BUILDING') drawBuilding(p.x, p.y, p.w * 2, s.color);
+                else drawStreetLight(p.x, p.y, p.w * 0.8);
+            }
+        });
+
+        // Obstáculos
+        obstacles.forEach(obs => {
+            let p = project(obs.x, 0.5, obs.z);
+            if (p.w > 0) {
+                if(obs.type === 'BUS') drawBus(p.x, p.y, p.w * 0.6, obs.color);
+                else drawCar(p.x, p.y, p.w * 0.5, obs.color);
+            }
+        });
+
+        // Player
+        if(gameState !== 'MENU') {
+            drawCar(halfW + (player.x * (width * 0.45)), height - 120, width * 0.18, "#3498db");
+        }
+    }
+
+    let lastTime = performance.now();
+    function gameLoop(now) {
+        update((now - lastTime) / 1000);
+        lastTime = now;
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('keydown', e => { if (e.key === "ArrowLeft") keys.left = true; if (e.key === "ArrowRight") keys.right = true; });
+    window.addEventListener('keyup', e => { if (e.key === "ArrowLeft") keys.left = false; if (e.key === "ArrowRight") keys.right = false; });
+    document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+    document.getElementById('btnLeft').addEventListener('touchend', () => keys.left = false);
+    document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+    document.getElementById('btnRight').addEventListener('touchend', () => keys.right = false);
+
+    requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
