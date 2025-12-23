@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Highway - Turbo</title>
+    <title>Midnight Highway - Chill Drive</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; margin: 0 auto; }
@@ -16,17 +16,17 @@
 
         .overlay {
             background: rgba(0,0,0,0.9); color: white; padding: 40px;
-            text-align: center; border-radius: 10px; border: 3px solid #ff4d4d;
-            pointer-events: auto; box-shadow: 0 0 20px #ff4d4d;
+            text-align: center; border-radius: 10px; border: 3px solid #0099ff;
+            pointer-events: auto; box-shadow: 0 0 20px #0099ff;
         }
 
         button {
-            background: #ff4d4d; border: none; padding: 12px 40px;
+            background: #0099ff; border: none; padding: 12px 40px;
             font-size: 22px; color: white; cursor: pointer; border-radius: 5px;
             margin-top: 20px; font-weight: bold; transition: 0.3s;
         }
 
-        button:hover { background: #ff1a1a; transform: scale(1.1); }
+        button:hover { background: #007acc; transform: scale(1.05); }
 
         #hud {
             position: absolute; top: 20px; left: 20px; color: #fff;
@@ -41,15 +41,15 @@
 
 <div id="ui-layer">
     <div id="menu" class="overlay">
-        <h1 style="color: #ff4d4d;">HIGHWAY TURBO</h1>
-        <p>Use as SETAS para pilotar</p>
-        <button onclick="startGame()">INICIAR</button>
+        <h1 style="color: #0099ff;">CHILL HIGHWAY</h1>
+        <p>Use as SETAS para pilotar com calma</p>
+        <button onclick="startGame()">INICIAR PASSEIO</button>
     </div>
 
     <div id="game-over" class="overlay" style="display:none;">
-        <h1 style="color: #ff4d4d;">GAME OVER</h1>
+        <h1 style="color: #ff4d4d;">FIM DA LINHA</h1>
         <p id="final-score">Score: 0</p>
-        <button onclick="startGame()">RECOMEÇAR</button>
+        <button onclick="startGame()">TENTAR DE NOVO</button>
     </div>
 </div>
 
@@ -70,9 +70,9 @@ let isRunning = false;
 let obstacles = [];
 let scenery = [];
 
-// Ajustes de Velocidade e Posição
-const GAME_SPEED = 25; // Aumentado (era 10)
-const PLAYER_SENSITIVITY = 0.06;
+// --- AJUSTES DE VELOCIDADE (MAIS LENTO AGORA) ---
+const GAME_SPEED = 12; 
+const PLAYER_SENSITIVITY = 0.04; 
 
 function resize() {
     width = window.innerWidth;
@@ -95,16 +95,16 @@ function startGame() {
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Gerar prédios iniciais FORA da estrada
+    // Gerar cenário lateral inicial (Fora da estrada)
     for(let i = 0; i < 20; i++) {
-        addScenery(i * 60);
+        addScenery(i * 70);
     }
     
     animate();
 }
 
 function addScenery(z) {
-    // x > 1.2 ou x < -1.2 garante que fiquem fora da estrada
+    // x > 1.3 ou x < -1.3 (Garante distância da pista)
     const side = Math.random() > 0.5 ? (1.5 + Math.random()) : (-1.5 - Math.random());
     const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
     scenery.push({
@@ -123,19 +123,18 @@ function animate() {
     if(!isRunning) return;
 
     roadOffset += GAME_SPEED;
-    score += 2;
-    scoreLabel.innerText = `Score: ${Math.floor(score/10)}`;
+    score += 1;
+    scoreLabel.innerText = `Score: ${Math.floor(score/5)}`;
 
     if(keys['ArrowLeft']) playerX -= PLAYER_SENSITIVITY;
     if(keys['ArrowRight']) playerX += PLAYER_SENSITIVITY;
     playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    // Gerar tráfego DENTRO da estrada (x entre -0.8 e 0.8)
-    if(score % 40 === 0) {
-        const laneX = (Math.random() * 1.6) - 0.8;
+    // Gerar tráfego na pista (x entre -0.8 e 0.8)
+    if(score % 80 === 0) { // Intervalo maior entre carros
         obstacles.push({
             z: 1000, 
-            x: laneX, 
+            x: (Math.random() * 1.6) - 0.8, 
             type: Math.random() > 0.4 ? 'car' : 'bus'
         });
     }
@@ -148,11 +147,11 @@ function render() {
     // Fundo
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, horizon);
-    ctx.fillStyle = "#1a3300"; // Grama escura
+    ctx.fillStyle = "#152b00"; // Grama noturna
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Desenho da Estrada (Perspectiva)
-    ctx.fillStyle = "#333";
+    // Estrada
+    ctx.fillStyle = "#222";
     ctx.beginPath();
     ctx.moveTo(width/2 - 30, horizon);
     ctx.lineTo(width/2 + 30, horizon);
@@ -160,24 +159,23 @@ function render() {
     ctx.lineTo(width * -0.2, height);
     ctx.fill();
 
-    // Faixas brancas laterais
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 5;
+    // Faixas laterais
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(width/2 - 30, horizon); ctx.lineTo(width * -0.15, height);
     ctx.moveTo(width/2 + 30, horizon); ctx.lineTo(width * 1.15, height);
     ctx.stroke();
 
-    // Faixa tracejada central
-    ctx.setLineDash([30, 60]);
-    ctx.lineDashOffset = -roadOffset * 2;
+    // Faixa central (animada)
+    ctx.setLineDash([20, 50]);
+    ctx.lineDashOffset = -roadOffset * 1.5;
     ctx.beginPath();
     ctx.moveTo(width/2, horizon);
     ctx.lineTo(width/2, height);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Renderizar tudo com profundidade
     const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
 
     allObjects.forEach(obj => {
@@ -185,7 +183,6 @@ function render() {
         
         if(obj.z < 1) {
             obj.z = 1000;
-            // Se for obstáculo, reposiciona em uma faixa aleatória
             if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.6) - 0.8;
             return;
         }
@@ -198,49 +195,43 @@ function render() {
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-            // Janelas acesas
+            // Janelas
             ctx.fillStyle = "#ffffaa";
-            ctx.fillRect(xPos - size/2, yPos - size*3, size/4, size/4);
-            ctx.fillRect(xPos + size/4, yPos - size*2, size/4, size/4);
+            ctx.fillRect(xPos - size/2, yPos - size*3.5, size/4, size/4);
         } 
         else if(obj.type === 'lamp') {
-            ctx.fillStyle = "#777";
+            ctx.fillStyle = "#666";
             ctx.fillRect(xPos - 2, yPos - size*3, 4, size*3);
-            ctx.fillStyle = "yellow";
+            ctx.fillStyle = "rgba(255, 255, 0, 0.7)";
             ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*15, 0, Math.PI*2); ctx.fill();
         }
         else {
-            // NPC Cars / Bus
-            ctx.fillStyle = obj.type === 'bus' ? "#cc3333" : "#cc9900";
+            // NPCs (Na pista)
+            ctx.fillStyle = obj.type === 'bus' ? "#d9534f" : "#f0ad4e";
             ctx.fillRect(xPos - size/2, yPos - size/2, size, size/2);
-            // Vidro traseiro
-            ctx.fillStyle = "#222";
-            ctx.fillRect(xPos - size/2 + 5, yPos - size/2 + 5, size - 10, size/5);
-
-            // Colisão (Ajustada para a nova velocidade)
+            
+            // Colisão
             if(obj.z < 60 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.35) {
                 endGame();
             }
         }
     });
 
-    // Carro do Jogador (Azul) - Fixo na base
+    // Carro do Jogador (Azul)
     const pSize = 100;
     const px = width/2;
     const py = height - 100;
     
     ctx.fillStyle = "#0099ff";
-    ctx.fillRect(px - pSize/2, py - 30, pSize, 40); // Base
-    ctx.fillStyle = "#00ccff";
-    ctx.fillRect(px - pSize/3, py - 55, pSize/1.5, 30); // Teto
-    ctx.fillStyle = "#333";
-    ctx.fillRect(px - pSize/3 + 5, py - 50, pSize/1.5 - 10, 15); // Vidro
+    ctx.fillRect(px - pSize/2, py - 30, pSize, 40); 
+    ctx.fillStyle = "#333"; // Vidro
+    ctx.fillRect(px - pSize/2 + 10, py - 25, pSize - 20, 10);
 }
 
 function endGame() {
     isRunning = false;
     gameOverScreen.style.display = 'block';
-    document.getElementById('final-score').innerText = `Pontos: ${Math.floor(score/10)}`;
+    document.getElementById('final-score').innerText = `Pontos: ${Math.floor(score/5)}`;
 }
 </script>
 
