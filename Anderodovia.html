@@ -2,143 +2,25 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Day Drive</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Day Drive - Final</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #555; }
-        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: #444; font-size: 12px; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; touch-action: none; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #555; z-index: 10; }
+        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: #444; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="ui">SCORE: <span id="score">0</span></div>
-    <div id="controles">PC: SETAS | MOBILE: TOQUE LATERAIS</div>
+    <div id="ui">PONTOS: <span id="score">0</span></div>
+    <div id="controles">PC: SETAS | MOBILE: TOQUE NAS LATERAIS</div>
 
     <script type="module">
         import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 
+        // --- CONFIGURAÇÃO BÁSICA ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Azul Céu
-        scene.fog = new THREE.Fog(0x87CEEB, 40, 120); // Neblina clara para o horizonte
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 50, 150);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Ativa sombras
-        document.body.appendChild(renderer.domElement);
-
-        // --- AMBIENTE DE DIA ---
-        const worldGroup = new THREE.Group();
-        scene.add(worldGroup);
-
-        function createFloor() {
-            // Grama mais clara
-            const planeGeo = new THREE.PlaneGeometry(200, 400);
-            const planeMat = new THREE.MeshPhongMaterial({ color: 0x228B22 }); 
-            const floor = new THREE.Mesh(planeGeo, planeMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            worldGroup.add(floor);
-
-            // Asfalto cinza
-            const roadGeo = new THREE.PlaneGeometry(14, 400);
-            const roadMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
-            const road = new THREE.Mesh(roadGeo, roadMat);
-            road.position.y = 0.01;
-            floor.add(road);
-
-            // Linhas brancas laterais e central azul
-            const blueLineGeo = new THREE.PlaneGeometry(0.3, 400);
-            const blueLineMat = new THREE.MeshBasicMaterial({ color: 0x0055ff });
-            const line1 = new THREE.Mesh(blueLineGeo, blueLineMat);
-            line1.position.set(-0.5, 0.02, 0);
-            floor.add(line1);
-            
-            const line2 = new THREE.Mesh(blueLineGeo, blueLineMat);
-            line2.position.set(0.5, 0.02, 0);
-            floor.add(line2);
-            
-            for(let i = -200; i < 200; i += 15) {
-                const sGeo = new THREE.PlaneGeometry(0.5, 6);
-                const sMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const s = new THREE.Mesh(sGeo, sMat);
-                s.position.set(0, 0.03, i);
-                floor.add(s);
-            }
-        }
-        createFloor();
-
-        // --- ILUMINAÇÃO SOLAR ---
-        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-        sun.position.set(10, 20, 10);
-        sun.castShadow = true;
-        scene.add(sun);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
-        // --- JOGADOR (CARRO AZUL) ---
-        const player = new THREE.Group();
-        const carBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 2.2), new THREE.MeshPhongMaterial({color: 0x00ccff}));
-        carBody.position.y = 0.5;
-        carBody.castShadow = true;
-        player.add(carBody);
-        scene.add(player);
-        player.position.set(-3, 0, 10);
-
-        // --- OBSTÁCULOS ---
-        const obstacles = [];
-        function spawnEnemy() {
-            const isBus = Math.random() > 0.7;
-            const color = isBus ? 0xcc0000 : (Math.random() > 0.5 ? 0xffcc00 : 0xff00ff);
-            const geo = isBus ? new THREE.BoxGeometry(1.5, 1.5, 5) : new THREE.BoxGeometry(1.2, 0.7, 2.2);
-            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color: color}));
-            mesh.castShadow = true;
-            
-            const lane = (Math.floor(Math.random() * 2) === 0) ? -3.5 : 3.5;
-            mesh.position.set(lane, isBus ? 0.75 : 0.5, -100);
-            scene.add(mesh);
-            obstacles.push(mesh);
-        }
-
-        // --- PRÉDIOS DIA ---
-        const buildings = [];
-        function spawnBuilding(z, side) {
-            const h = 10 + Math.random() * 15;
-            const geo = new THREE.BoxGeometry(4, h, 4);
-            const colors = [0xaaaaaa, 0xbbbbbb, 0x888888, 0x9999ff];
-            const mat = new THREE.MeshPhongMaterial({color: colors[Math.floor(Math.random()*colors.length)]});
-            const b = new THREE.Mesh(geo, mat);
-            b.position.set(side * 15, h/2, z);
-            b.castShadow = true;
-            worldGroup.add(b);
-            buildings.push(b);
-        }
-
-        for(let i = 0; i > -200; i -= 20) {
-            spawnBuilding(i, 1);
-            spawnBuilding(i, -1);
-        }
-
-        // --- LÓGICA DE MOVIMENTO ---
-        let score = 0;
-        let speed = 1.0;
-        const keys = { left: false, right: false };
-
-        window.onkeydown = (e) => { 
-            if(e.code == "ArrowLeft") keys.left = true;
-            if(e.code == "ArrowRight") keys.right = true;
-        };
-        window.onkeyup = (e) => { 
-            if(e.code == "ArrowLeft") keys.left = false;
-            if(e.code == "ArrowRight") keys.right = false;
-        };
-
-        window.ontouchstart = (e) => {
-            if(e.touches[0].clientX < window.innerWidth/2) keys.left = true;
-            else keys.right = true;
-        };
-        window.ontouchend = () => { keys.left = false; keys.right = false; };
-
-        function update() {
-            requestAnimationFrame(update);
-
-            worldGroup.position.z += speed;
+        const renderer = new THREE.WebGLRenderer({ antialias: true
