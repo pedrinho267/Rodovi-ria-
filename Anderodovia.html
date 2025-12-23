@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Drive - Centralizado</title>
+    <title>Retro Drive - Engine Pro</title>
     <style>
         :root { --neon: #00d2ff; --warn: #ff3e3e; }
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', monospace; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', Tahoma, sans-serif; }
         canvas { display: block; touch-action: none; }
         
         #ui-layer {
@@ -20,14 +20,15 @@
             align-items: center; pointer-events: all; backdrop-filter: blur(8px);
         }
 
-        #hud { width: 90%; display: flex; justify-content: space-between; padding: 20px; font-size: 20px; font-weight: bold; }
+        #hud { width: 95%; display: flex; justify-content: space-between; padding: 20px; font-size: clamp(14px, 4vw, 20px); font-weight: bold; }
         .neon-text { text-shadow: 0 0 10px var(--neon); color: var(--neon); }
+        
         button {
-            padding: 15px 40px; font-size: 20px; background: none; 
-            border: 2px solid var(--neon); color: white; cursor: pointer;
-            transition: 0.3s; box-shadow: 0 0 10px var(--neon);
+            padding: 15px 45px; font-size: 22px; background: none; 
+            border: 3px solid var(--neon); color: white; cursor: pointer;
+            transition: 0.2s; font-weight: bold; text-transform: uppercase;
         }
-        button:hover { background: var(--neon); color: black; }
+        button:active { transform: scale(0.95); background: var(--neon); color: #000; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -38,39 +39,43 @@
     <div id="ui-layer">
         <div id="hud" class="hidden">
             <div>SCORE: <span id="dist-val" class="neon-text">0</span></div>
-            <div>SPEED: <span id="speed-val" class="neon-text">0</span>km/h</div>
+            <div>SPEED: <span id="speed-val" class="neon-text">0</span> KM/H</div>
         </div>
         
         <div id="main-menu" class="screen">
-            <h1 class="neon-text" style="font-size: clamp(30px, 10vw, 60px);">RETRO DRIVE</h1>
+            <h1 class="neon-text" style="font-size: clamp(40px, 12vw, 70px); margin-bottom: 30px;">RETRO DRIVE</h1>
             <button onclick="Game.start()">START</button>
         </div>
 
         <div id="game-over" class="screen hidden">
-            <h1 style="color: var(--warn); font-size: 50px;">CRASH!</h1>
-            <p id="final-stats" style="margin-bottom: 20px;"></p>
-            <button onclick="Game.start()" style="border-color: var(--warn); box-shadow: 0 0 10px var(--warn);">RETRY</button>
+            <h1 style="color: var(--warn); font-size: clamp(40px, 12vw, 60px);">CRASH!</h1>
+            <p id="final-stats" style="margin-bottom: 30px; font-size: 20px;"></p>
+            <button onclick="Game.start()" style="border-color: var(--warn);">RETRY</button>
         </div>
     </div>
 
 <script>
+/**
+ * ENGINE CORE: Pseudo-3D Centralized Road System
+ * Otimizado para manter o ponto de fuga estático e o jogador móvel sobre a pista.
+ */
 const Game = {
     canvas: document.getElementById('gameCanvas'),
     ctx: null,
     dpr: window.devicePixelRatio || 1,
     
-    // Configurações Técnicas
+    // Configurações de Mundo
     fieldOfView: 100,
-    cameraHeight: 800,
-    drawDistance: 250,
+    cameraHeight: 850,
+    drawDistance: 300,
     segmentLength: 200,
     roadWidth: 2000,
     
     state: 'MENU',
     position: 0,
     speed: 0,
-    maxSpeed: 28000,
-    playerX: 0, // Agora 0 é o centro absoluto
+    maxSpeed: 30000,
+    playerX: 0, // 0 = Centro absoluto
     obstacles: [],
     
     init() {
@@ -87,7 +92,6 @@ const Game = {
         this.ctx.scale(this.dpr, this.dpr);
         this.screenW = window.innerWidth;
         this.screenH = window.innerHeight;
-        // Calcula profundidade baseada no FOV
         this.cameraDepth = 1 / Math.tan((this.fieldOfView / 2) * Math.PI / 180);
     },
 
@@ -103,14 +107,15 @@ const Game = {
         document.getElementById('hud').classList.remove('hidden');
     },
 
-    // Projeção Matemática 3D Centralizada
+    // Projeção 3D Centralizada
     project(pX, pY, pZ) {
         const relZ = pZ - this.position;
         if (relZ <= 0) return { x: 0, y: 0, w: 0, scale: 0 };
         
         const scale = this.cameraDepth / relZ;
         return {
-            // O centro da tela é o eixo de referência (this.screenW / 2)
+            // A estrada permanece no centro (screenW/2)
+            // O movimento lateral do jogador (playerX) desloca os objetos e bordas
             x: (this.screenW / 2) + (scale * (pX - (this.playerX * this.roadWidth)) * this.screenW / 2),
             y: (this.screenH / 2) - (scale * (pY - this.cameraHeight) * this.screenH / 2),
             w: scale * this.roadWidth * this.screenW / 2,
@@ -121,25 +126,23 @@ const Game = {
     update(dt) {
         if (this.state !== 'PLAYING') return;
 
-        // Aceleração Progressiva
-        this.speed = Math.min(this.speed + 1200 * dt, this.maxSpeed);
+        // Progressão
+        this.speed = Math.min(this.speed + 1400 * dt, this.maxSpeed);
         this.position += this.speed * dt;
 
-        // Controle Lateral
-        const step = 6 * dt;
+        // Input
+        const step = 6.5 * dt;
         if (this.keys.left) this.playerX -= step;
         if (this.keys.right) this.playerX += step;
-        
-        // Limites da pista
-        this.playerX = Math.max(-0.9, Math.min(0.9, this.playerX));
+        this.playerX = Math.max(-0.95, Math.min(0.95, this.playerX));
 
-        // Spawn de Pedras
+        // Spawning de Pedras
         if (this.obstacles.length < 8) {
             const lastZ = this.obstacles.length ? this.obstacles[this.obstacles.length-1].z : this.position;
-            if (lastZ - this.position < 15000) {
+            if (lastZ - this.position < 18000) {
                 this.obstacles.push({
-                    x: (Math.random() * 1.6 - 0.8), // Spawn dentro da pista
-                    z: lastZ + 4000 + Math.random() * 6000
+                    x: (Math.random() * 1.6 - 0.8), 
+                    z: lastZ + 5000 + Math.random() * 7000
                 });
             }
         }
@@ -148,54 +151,46 @@ const Game = {
         document.getElementById('dist-val').innerText = Math.floor(this.position / 100);
         document.getElementById('speed-val').innerText = Math.floor(this.speed / 100);
 
-        // Colisão
+        // Colisão AABB
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const o = this.obstacles[i];
             const relZ = o.z - this.position;
+            if (relZ < 0) { this.obstacles.splice(i, 1); continue; }
             
-            if (relZ < 0) {
-                this.obstacles.splice(i, 1);
-                continue;
-            }
-            
-            // Verificação de Hitbox
             if (relZ < 300 && relZ > 0) {
                 if (Math.abs(this.playerX - o.x) < 0.35) {
-                    this.state = 'GAMEOVER';
-                    document.getElementById('game-over').classList.remove('hidden');
-                    document.getElementById('final-stats').innerText = `SCORE FINAL: ${Math.floor(this.position / 100)}`;
+                    this.die();
                 }
             }
         }
     },
 
+    die() {
+        this.state = 'GAMEOVER';
+        document.getElementById('game-over').classList.remove('hidden');
+        document.getElementById('final-stats').innerText = `DISTÂNCIA: ${Math.floor(this.position / 100)}M`;
+    },
+
     draw() {
         const ctx = this.ctx;
-        
-        // Limpar Fundo (Céu)
-        ctx.fillStyle = '#050510';
+        ctx.fillStyle = '#050510'; // Céu
         ctx.fillRect(0, 0, this.screenW, this.screenH / 2);
-        
-        // Grama/Chão
-        ctx.fillStyle = '#0a0a20';
+        ctx.fillStyle = '#0a0a20'; // Chão
         ctx.fillRect(0, this.screenH / 2, this.screenW, this.screenH / 2);
 
-        // Renderização da Estrada por Segmentos
+        // Renderização da Estrada
         const startPos = Math.floor(this.position / this.segmentLength) * this.segmentLength;
-        
         for (let n = this.drawDistance; n > 0; n--) {
             const z1 = startPos + (n - 1) * this.segmentLength;
             const z2 = z1 + this.segmentLength;
-            
             const p1 = this.project(0, 0, z1);
             const p2 = this.project(0, 0, z2);
 
             if (p1.y <= p2.y || p1.scale <= 0) continue;
 
             const isDark = (Math.floor(z1/this.segmentLength) % 2);
+            ctx.fillStyle = isDark ? '#1a1a1a' : '#222';
             
-            // Corpo da Estrada
-            ctx.fillStyle = isDark ? '#222' : '#282828';
             ctx.beginPath();
             ctx.moveTo(p1.x - p1.w, p1.y);
             ctx.lineTo(p1.x + p1.w, p1.y);
@@ -204,48 +199,42 @@ const Game = {
             ctx.fill();
 
             // Bordas Neon
-            ctx.strokeStyle = isDark ? '#00d2ff' : '#005f7a';
+            ctx.strokeStyle = isDark ? '#00d2ff' : '#004c5c';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Linha Central (opcional para feedback de velocidade)
+            // Linha Central Amarela
             if (!isDark) {
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(p1.x - 2, p2.y, 4, p1.y - p2.y);
+                ctx.fillStyle = '#f1c40f';
+                const lw = p1.w * 0.05;
+                ctx.fillRect(p1.x - lw/2, p2.y, lw, p1.y - p2.y);
             }
         }
 
-        // Desenhar Pedras (Obstáculos)
+        // Desenhar Pedras
         this.obstacles.forEach(o => {
             const p = this.project(o.x * this.roadWidth, 0, o.z);
             if (p.scale > 0 && p.scale < 1) {
-                ctx.fillStyle = '#555';
+                ctx.fillStyle = '#444';
                 ctx.beginPath();
-                ctx.moveTo(p.x - p.w/8, p.y);
-                ctx.lineTo(p.x, p.y - p.w/5);
-                ctx.lineTo(p.x + p.w/8, p.y);
+                ctx.moveTo(p.x - p.w/10, p.y);
+                ctx.lineTo(p.x, p.y - p.w/6);
+                ctx.lineTo(p.x + p.w/10, p.y);
                 ctx.fill();
             }
         });
 
-        // Desenhar Carrinho do Jogador
-        const pSize = this.screenW * 0.15;
-        const pY = this.screenH - 100;
-        
-        // Sombra do carro
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        ctx.fillRect(this.screenW/2 - pSize/2, pY + 5, pSize, 10);
-
-        // Carro (centralizado na visualização)
+        // Jogador (Estático no centro da tela)
+        const pSize = Math.min(this.screenW * 0.2, 120);
+        const pY = this.screenH - 120;
         ctx.fillStyle = '#00d2ff';
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#00d2ff';
+        ctx.shadowBlur = 15; ctx.shadowColor = '#00d2ff';
         ctx.fillRect(this.screenW/2 - pSize/2, pY - pSize/3, pSize, pSize/3);
         ctx.shadowBlur = 0;
         
-        // Detalhe de Vidro
+        // Detalhe Vidro
         ctx.fillStyle = '#fff';
-        ctx.fillRect(this.screenW/2 - pSize/3, pY - pSize/4, pSize/1.5, 5);
+        ctx.fillRect(this.screenW/2 - pSize/3, pY - pSize/3.5, pSize/1.5, 6);
     },
 
     bindEvents() {
@@ -257,7 +246,7 @@ const Game = {
         window.addEventListener('keydown', keyHandler(true));
         window.addEventListener('keyup', keyHandler(false));
         
-        // Touch Controls
+        // Controles Mobile
         this.canvas.addEventListener('touchstart', (e) => {
             const x = e.touches[0].clientX;
             if (x < this.screenW / 2) this.keys.left = true;
@@ -265,8 +254,7 @@ const Game = {
             e.preventDefault();
         }, {passive: false});
         this.canvas.addEventListener('touchend', () => {
-            this.keys.left = false;
-            this.keys.right = false;
+            this.keys.left = false; this.keys.right = false;
         });
     },
 
@@ -274,7 +262,6 @@ const Game = {
         const now = performance.now();
         const dt = Math.min((now - (this.lastUpdateTime || now)) / 1000, 0.1);
         this.lastUpdateTime = now;
-
         this.update(dt);
         this.draw();
         requestAnimationFrame(() => this.loop());
