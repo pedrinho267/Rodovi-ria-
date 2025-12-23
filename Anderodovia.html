@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Highway Racer</title>
+    <title>Midnight Highway - Turbo</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
-        canvas { display: block; margin: 0 auto; background: #2d5a27; } /* Grama de fundo */
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; margin: 0 auto; }
         
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -15,20 +15,23 @@
         }
 
         .overlay {
-            background: rgba(0,0,0,0.85); color: white; padding: 40px;
-            text-align: center; border-radius: 15px; border: 2px solid #5bc0de;
-            pointer-events: auto;
+            background: rgba(0,0,0,0.9); color: white; padding: 40px;
+            text-align: center; border-radius: 10px; border: 3px solid #ff4d4d;
+            pointer-events: auto; box-shadow: 0 0 20px #ff4d4d;
         }
 
         button {
-            background: #5bc0de; border: none; padding: 10px 30px;
-            font-size: 20px; color: white; cursor: pointer; border-radius: 5px;
-            margin-top: 20px; font-weight: bold;
+            background: #ff4d4d; border: none; padding: 12px 40px;
+            font-size: 22px; color: white; cursor: pointer; border-radius: 5px;
+            margin-top: 20px; font-weight: bold; transition: 0.3s;
         }
 
+        button:hover { background: #ff1a1a; transform: scale(1.1); }
+
         #hud {
-            position: absolute; top: 20px; left: 20px; color: white;
-            font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000;
+            position: absolute; top: 20px; left: 20px; color: #fff;
+            font-size: 28px; font-weight: bold; text-shadow: 2px 2px #000;
+            z-index: 100;
         }
     </style>
 </head>
@@ -38,15 +41,15 @@
 
 <div id="ui-layer">
     <div id="menu" class="overlay">
-        <h1>MIDNIGHT DRIVE</h1>
-        <p>Desvie do trânsito usando as Setas do Teclado</p>
-        <button onclick="startGame()">JOGAR</button>
+        <h1 style="color: #ff4d4d;">HIGHWAY TURBO</h1>
+        <p>Use as SETAS para pilotar</p>
+        <button onclick="startGame()">INICIAR</button>
     </div>
 
     <div id="game-over" class="overlay" style="display:none;">
-        <h1 style="color: #ff4d4d;">BATEU!</h1>
+        <h1 style="color: #ff4d4d;">GAME OVER</h1>
         <p id="final-score">Score: 0</p>
-        <button onclick="startGame()">TENTAR NOVAMENTE</button>
+        <button onclick="startGame()">RECOMEÇAR</button>
     </div>
 </div>
 
@@ -59,14 +62,17 @@ const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
 const scoreLabel = document.getElementById('hud');
 
-// Configurações de perspectiva
 let width, height, horizon;
-let playerX = 0; // -1 a 1
+let playerX = 0; 
 let roadOffset = 0;
 let score = 0;
 let isRunning = false;
 let obstacles = [];
 let scenery = [];
+
+// Ajustes de Velocidade e Posição
+const GAME_SPEED = 25; // Aumentado (era 10)
+const PLAYER_SENSITIVITY = 0.06;
 
 function resize() {
     width = window.innerWidth;
@@ -79,16 +85,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Classes do Jogo
-class GameObject {
-    constructor(z, x, type) {
-        this.z = z; // Distância (0 a 1000)
-        this.x = x; // Posição horizontal
-        this.type = type;
-        this.width = type === 'bus' ? 0.6 : 0.4;
-    }
-}
-
 function startGame() {
     score = 0;
     playerX = 0;
@@ -99,16 +95,17 @@ function startGame() {
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Gerar prédios e postes iniciais
+    // Gerar prédios iniciais FORA da estrada
     for(let i = 0; i < 20; i++) {
-        addScenery(i * 50);
+        addScenery(i * 60);
     }
     
     animate();
 }
 
 function addScenery(z) {
-    const side = Math.random() > 0.5 ? 1.5 : -1.5;
+    // x > 1.2 ou x < -1.2 garante que fiquem fora da estrada
+    const side = Math.random() > 0.5 ? (1.5 + Math.random()) : (-1.5 - Math.random());
     const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
     scenery.push({
         z: z,
@@ -125,18 +122,22 @@ window.onkeyup = (e) => keys[e.code] = false;
 function animate() {
     if(!isRunning) return;
 
-    // Lógica
-    roadOffset += 10;
-    score += 1;
+    roadOffset += GAME_SPEED;
+    score += 2;
     scoreLabel.innerText = `Score: ${Math.floor(score/10)}`;
 
-    if(keys['ArrowLeft']) playerX -= 0.04;
-    if(keys['ArrowRight']) playerX += 0.04;
-    playerX = Math.max(-1, Math.min(1, playerX));
+    if(keys['ArrowLeft']) playerX -= PLAYER_SENSITIVITY;
+    if(keys['ArrowRight']) playerX += PLAYER_SENSITIVITY;
+    playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    // Gerar tráfego
-    if(score % 60 === 0) {
-        obstacles.push(new GameObject(1000, (Math.random()*1.6)-0.8, Math.random() > 0.5 ? 'bus' : 'car'));
+    // Gerar tráfego DENTRO da estrada (x entre -0.8 e 0.8)
+    if(score % 40 === 0) {
+        const laneX = (Math.random() * 1.6) - 0.8;
+        obstacles.push({
+            z: 1000, 
+            x: laneX, 
+            type: Math.random() > 0.4 ? 'car' : 'bus'
+        });
     }
 
     render();
@@ -144,96 +145,102 @@ function animate() {
 }
 
 function render() {
-    // 1. Céu e Fundo
+    // Fundo
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, horizon);
-    ctx.fillStyle = "#2d5a27"; // Grama
+    ctx.fillStyle = "#1a3300"; // Grama escura
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // 2. Estrada (Trapezóide)
+    // Desenho da Estrada (Perspectiva)
     ctx.fillStyle = "#333";
     ctx.beginPath();
-    ctx.moveTo(width/2 - 20, horizon);
-    ctx.lineTo(width/2 + 20, horizon);
-    ctx.lineTo(width * 0.9, height);
-    ctx.lineTo(width * 0.1, height);
+    ctx.moveTo(width/2 - 30, horizon);
+    ctx.lineTo(width/2 + 30, horizon);
+    ctx.lineTo(width * 1.2, height);
+    ctx.lineTo(width * -0.2, height);
     ctx.fill();
 
-    // Faixas da estrada
+    // Faixas brancas laterais
     ctx.strokeStyle = "white";
-    ctx.setLineDash([20, 40]);
-    ctx.lineDashOffset = -roadOffset;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(width/2 - 30, horizon); ctx.lineTo(width * -0.15, height);
+    ctx.moveTo(width/2 + 30, horizon); ctx.lineTo(width * 1.15, height);
+    ctx.stroke();
+
+    // Faixa tracejada central
+    ctx.setLineDash([30, 60]);
+    ctx.lineDashOffset = -roadOffset * 2;
     ctx.beginPath();
     ctx.moveTo(width/2, horizon);
     ctx.lineTo(width/2, height);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 3. Renderizar Cenário e Obstáculos
+    // Renderizar tudo com profundidade
     const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
 
     allObjects.forEach(obj => {
-        obj.z -= 10;
+        obj.z -= GAME_SPEED;
+        
         if(obj.z < 1) {
             obj.z = 1000;
-            if(obj.type === 'building' || obj.type === 'lamp') return;
+            // Se for obstáculo, reposiciona em uma faixa aleatória
+            if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.6) - 0.8;
+            return;
         }
 
-        const scale = 30 / (obj.z || 1);
-        const xPos = width/2 + (obj.x - playerX) * scale * 100;
-        const yPos = horizon + (scale * 200);
-        const size = scale * 50;
+        const scale = 40 / obj.z;
+        const xPos = width/2 + (obj.x - playerX) * scale * 250;
+        const yPos = horizon + (scale * 300);
+        const size = scale * 80;
 
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
-            ctx.fillRect(xPos - size, yPos - size*3, size*2, size*3);
-            // Janelas
-            ctx.fillStyle = "#add8e6";
-            for(let i=0; i<3; i++) ctx.fillRect(xPos - size/2, yPos - size*(1+i), size/2, size/3);
+            ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
+            // Janelas acesas
+            ctx.fillStyle = "#ffffaa";
+            ctx.fillRect(xPos - size/2, yPos - size*3, size/4, size/4);
+            ctx.fillRect(xPos + size/4, yPos - size*2, size/4, size/4);
         } 
         else if(obj.type === 'lamp') {
-            ctx.strokeStyle = "#888";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(xPos, yPos);
-            ctx.lineTo(xPos, yPos - size*2);
-            ctx.stroke();
-            // Brilho da luz
-            ctx.fillStyle = "rgba(255, 255, 180, 0.5)";
-            ctx.beginPath(); ctx.arc(xPos, yPos - size*2, size/2, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#777";
+            ctx.fillRect(xPos - 2, yPos - size*3, 4, size*3);
+            ctx.fillStyle = "yellow";
+            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*15, 0, Math.PI*2); ctx.fill();
         }
-        else if(obj.type === 'bus' || obj.type === 'car') {
-            // Desenhar Ônibus/Carro NPC
-            ctx.fillStyle = obj.type === 'bus' ? "#d9534f" : "#f0ad4e";
-            ctx.fillRect(xPos - size, yPos - size, size * 2, size);
-            
-            // Colisão
-            if(obj.z < 50 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.4) {
+        else {
+            // NPC Cars / Bus
+            ctx.fillStyle = obj.type === 'bus' ? "#cc3333" : "#cc9900";
+            ctx.fillRect(xPos - size/2, yPos - size/2, size, size/2);
+            // Vidro traseiro
+            ctx.fillStyle = "#222";
+            ctx.fillRect(xPos - size/2 + 5, yPos - size/2 + 5, size - 10, size/5);
+
+            // Colisão (Ajustada para a nova velocidade)
+            if(obj.z < 60 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.35) {
                 endGame();
             }
         }
     });
 
-    // 4. Carro do Jogador (Azul)
-    const pSize = 80;
+    // Carro do Jogador (Azul) - Fixo na base
+    const pSize = 100;
     const px = width/2;
-    const py = height - 120;
+    const py = height - 100;
     
-    // Sombra
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.fillRect(px - pSize/2, py + 40, pSize, 20);
-    // Corpo
-    ctx.fillStyle = "#5bc0de";
-    ctx.fillRect(px - pSize/2, py, pSize, 50);
-    ctx.fillStyle = "#333"; // Vidro
-    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, 15);
+    ctx.fillStyle = "#0099ff";
+    ctx.fillRect(px - pSize/2, py - 30, pSize, 40); // Base
+    ctx.fillStyle = "#00ccff";
+    ctx.fillRect(px - pSize/3, py - 55, pSize/1.5, 30); // Teto
+    ctx.fillStyle = "#333";
+    ctx.fillRect(px - pSize/3 + 5, py - 50, pSize/1.5 - 10, 15); // Vidro
 }
 
 function endGame() {
     isRunning = false;
     gameOverScreen.style.display = 'block';
-    document.getElementById('final-score').innerText = `Score Final: ${Math.floor(score/10)}`;
+    document.getElementById('final-score').innerText = `Pontos: ${Math.floor(score/10)}`;
 }
 </script>
 
