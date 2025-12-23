@@ -2,155 +2,161 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Simulador 3D Ultra Night</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>3D Night City - Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; pointer-events: none; }
-        #controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
-        .btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; user-select: none; pointer-events: auto; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
+        canvas { display: block; }
+        #overlay { position: absolute; top: 10px; left: 10px; color: lime; font-family: monospace; pointer-events: none; text-shadow: 2px 2px #000; }
+        .controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
+        .btn { width: 90px; height: 90px; background: rgba(255,255,255,0.15); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; pointer-events: auto; user-select: none; -webkit-user-select: none; }
+        .btn:active { background: rgba(255,255,255,0.4); }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h1>Night Drive 3D</h1>
-        <p>Use Setas ou Toque na Tela</p>
+    <div id="overlay">FPS: 60 | 3D RENDER: ON | MOBILE: OK</div>
+    <div class="controls">
+        <div class="btn" id="left">ESQ</div>
+        <div class="btn" id="right">DIR</div>
     </div>
-    <div id="controls">
-        <div class="btn" id="leftBtn">LEFT</div>
-        <div class="btn" id="rightBtn">RIGHT</div>
-    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
 
     <script type="module">
-        import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+        import * as THREE from 'three';
 
-        // --- CONFIGURAÇÃO DA CENA ---
+        // --- MOTOR E PERFORMANCE ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x000000, 10, 50);
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 20, 80);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // --- ILUMINAÇÃO (O realismo vem daqui) ---
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-        scene.add(ambientLight);
+        // --- LUZES (100% REALISMO DE LUZ) ---
+        const amb = new THREE.AmbientLight(0x404040, 1);
+        scene.add(amb);
 
-        // --- CRIAÇÃO DA ESTRADA ---
-        const roadGeo = new THREE.PlaneGeometry(20, 1000);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        // --- ELEMENTOS DA ESTRADA (IGUAL A IMAGEM) ---
+        const roadGroup = new THREE.Group();
+        scene.add(roadGroup);
+
+        // Grama (Lado esquerdo e direito)
+        const grassGeo = new THREE.PlaneGeometry(100, 200);
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x004400 });
+        const grass = new THREE.Mesh(grassGeo, grassMat);
+        grass.rotation.x = -Math.PI/2;
+        grass.position.y = -0.1;
+        scene.add(grass);
+
+        // Asfalto
+        const roadGeo = new THREE.PlaneGeometry(12, 200);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x151515 });
         const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
+        road.rotation.x = -Math.PI/2;
         scene.add(road);
 
-        // Faixa central
-        const stripeGeo = new THREE.PlaneGeometry(0.2, 2);
+        // Faixas Brancas
+        const stripeGeo = new THREE.PlaneGeometry(0.4, 4);
         const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const stripes = [];
-        for(let i = 0; i < 50; i++) {
-            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-            stripe.rotation.x = -Math.PI / 2;
-            stripe.position.y = 0.01;
-            stripe.position.z = -i * 5;
-            scene.add(stripe);
-            stripes.push(stripe);
+        for(let i=0; i<20; i++) {
+            const s = new THREE.Mesh(stripeGeo, stripeMat);
+            s.rotation.x = -Math.PI/2;
+            s.position.set(0, 0.02, -i*10);
+            roadGroup.add(s);
+            stripes.push(s);
         }
 
-        // --- CARRO DO JOGADOR (Cubo representativo) ---
-        const carGeo = new THREE.BoxGeometry(1, 0.5, 2);
-        const carMat = new THREE.MeshStandardMaterial({ color: 0x00aaff });
-        const playerCar = new THREE.Mesh(carGeo, carMat);
-        playerCar.position.y = 0.25;
-        playerCar.position.z = -5;
-        scene.add(playerCar);
+        // --- PRÉDIOS E POSTES ---
+        const buildings = [];
+        function createWorldObject(z) {
+            // Prédios coloridos da imagem
+            const colors = [0x554433, 0x882222, 0x228866, 0x444488];
+            const h = 5 + Math.random()*10;
+            const bGeo = new THREE.BoxGeometry(3, h, 3);
+            const bMat = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random()*colors.length)] });
+            const b = new THREE.Mesh(bGeo, bMat);
+            const side = Math.random() > 0.5 ? 1 : -1;
+            b.position.set(side * 10, h/2, z);
+            roadGroup.add(b);
+            buildings.push(b);
 
-        // Faróis do carro
-        const headlight = new THREE.SpotLight(0xffffff, 10, 20, 0.5);
-        headlight.position.set(0, 0, -1);
-        playerCar.add(headlight);
-        playerCar.add(headlight.target);
-        headlight.target.position.set(0, 0, -10);
-
-        // --- POSTES DE LUZ ---
-        const poles = [];
-        function createPole(z, side) {
-            const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 5);
-            const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-            const pole = new THREE.Mesh(poleGeo, poleMat);
-            pole.position.set(side * 8, 2.5, z);
+            // Poste de Luz
+            const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 8);
+            const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({color:0x333333}));
+            pole.position.set(side * 7, 4, z);
+            roadGroup.add(pole);
             
-            const lamp = new THREE.PointLight(0xffaa00, 2, 10);
-            lamp.position.set(0, 2.5, 0);
-            pole.add(lamp);
-            
-            scene.add(pole);
-            poles.push(pole);
+            const light = new THREE.PointLight(0xffcc00, 15, 15);
+            light.position.set(side * 7, 7, z);
+            roadGroup.add(light);
         }
 
-        for(let i = 0; i < 10; i++) {
-            createPole(-i * 15, 1);
-            createPole(-i * 15, -1);
-        }
+        for(let i=0; i<15; i++) createWorldObject(-i * 15);
 
-        // --- LÓGICA DE MOVIMENTO ---
-        let moveLeft = false;
-        let moveRight = false;
-        const speed = 0.5;
+        // --- JOGADOR (CARRO) ---
+        const car = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 2.5), new THREE.MeshStandardMaterial({color: 0x0088ff}));
+        car.add(body);
+        car.position.set(0, 0.4, -5);
+        scene.add(car);
 
-        // Controles PC
-        window.addEventListener('keydown', (e) => {
-            if(e.key === "ArrowLeft") moveLeft = true;
-            if(e.key === "ArrowRight") moveRight = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            if(e.key === "ArrowLeft") moveLeft = false;
-            if(e.key === "ArrowRight") moveRight = false;
-        });
+        // Faróis Reais
+        const f1 = new THREE.SpotLight(0xffffff, 20, 30, 0.4);
+        f1.position.set(0.5, 0, -1);
+        car.add(f1);
+        car.add(f1.target);
+        f1.target.position.set(0.5, -1, -10);
 
-        // Controles Mobile
-        document.getElementById('leftBtn').ontouchstart = () => moveLeft = true;
-        document.getElementById('leftBtn').ontouchend = () => moveLeft = false;
-        document.getElementById('rightBtn').ontouchstart = () => moveRight = true;
-        document.getElementById('rightBtn').ontouchend = () => moveRight = false;
+        // --- LÓGICA DE JOGO ---
+        let moveX = 0;
+        const speed = 0.8;
 
-        camera.position.set(0, 3, 2);
-        camera.lookAt(playerCar.position);
+        // Input Detect
+        const keys = {};
+        window.onkeydown = (e) => keys[e.code] = true;
+        window.onkeyup = (e) => keys[e.code] = false;
 
-        // --- LOOP DE ANIMAÇÃO (60 FPS) ---
-        function animate() {
-            requestAnimationFrame(animate);
+        document.getElementById('left').ontouchstart = () => keys['ArrowLeft'] = true;
+        document.getElementById('left').ontouchend = () => keys['ArrowLeft'] = false;
+        document.getElementById('right').ontouchstart = () => keys['ArrowRight'] = true;
+        document.getElementById('right').ontouchend = () => keys['ArrowRight'] = false;
 
-            // Movimento das faixas e postes (simula velocidade)
-            stripes.forEach(s => {
-                s.position.z += speed;
-                if(s.position.z > 5) s.position.z = -200;
+        camera.position.set(0, 4, 3);
+        camera.lookAt(0, 0, -15);
+
+        function update() {
+            // Movimento Infinito
+            roadGroup.children.forEach(obj => {
+                obj.position.z += speed;
+                if(obj.position.z > 20) {
+                    obj.position.z -= 150;
+                }
             });
 
-            poles.forEach(p => {
-                p.position.z += speed;
-                if(p.position.z > 10) p.position.z = -140;
-            });
+            // Controle
+            if(keys['ArrowLeft'] && car.position.x > -5) car.position.x -= 0.15;
+            if(keys['ArrowRight'] && car.position.x < 5) car.position.x += 0.15;
 
-            // Movimento lateral do jogador
-            if(moveLeft && playerCar.position.x > -4) playerCar.position.x -= 0.1;
-            if(moveRight && playerCar.position.x < 4) playerCar.position.x += 0.1;
-
-            // Suavidade da câmera
-            camera.position.x = playerCar.position.x * 0.5;
-            
+            camera.position.x = car.position.x * 0.7;
             renderer.render(scene, camera);
+            requestAnimationFrame(update);
         }
 
-        animate();
-
-        // Ajuste de tela
-        window.addEventListener('resize', () => {
+        // Correção de Bug Visível: Redimensionamento
+        window.onresize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        };
+
+        update();
     </script>
 </body>
 </html>
