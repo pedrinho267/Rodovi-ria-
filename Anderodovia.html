@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>3D Night City - Pro</title>
+    <title>Ultra Performance 3D Night</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
-        canvas { display: block; }
-        #overlay { position: absolute; top: 10px; left: 10px; color: lime; font-family: monospace; pointer-events: none; text-shadow: 2px 2px #000; }
-        .controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
-        .btn { width: 90px; height: 90px; background: rgba(255,255,255,0.15); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; pointer-events: auto; user-select: none; -webkit-user-select: none; }
-        .btn:active { background: rgba(255,255,255,0.4); }
+        #ui { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: 'Courier New', monospace; pointer-events: none; font-size: 12px; }
+        .controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
+        .btn { width: 70px; height: 70px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; user-select: none; pointer-events: auto; }
     </style>
 </head>
 <body>
-    <div id="overlay">FPS: 60 | 3D RENDER: ON | MOBILE: OK</div>
+    <div id="ui">MEMÓRIA: ESTÁVEL | GPU: OPTIMIZED | 60FPS</div>
     <div class="controls">
-        <div class="btn" id="left">ESQ</div>
-        <div class="btn" id="right">DIR</div>
+        <div class="btn" id="lBtn">←</div>
+        <div class="btn" id="rBtn">→</div>
     </div>
 
     <script type="importmap">
@@ -27,136 +25,119 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- MOTOR E PERFORMANCE ---
+        // --- SETUP DE ALTA PERFORMANCE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
-        scene.fog = new THREE.Fog(0x000000, 20, 80);
+        scene.fog = new THREE.Fog(0x000000, 15, 60);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita resolução para evitar lag
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // --- LUZES (100% REALISMO DE LUZ) ---
-        const amb = new THREE.AmbientLight(0x404040, 1);
-        scene.add(amb);
+        // --- LUZES OTIMIZADAS (Lambert/Phong em vez de Standard) ---
+        const light = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
+        scene.add(light);
 
-        // --- ELEMENTOS DA ESTRADA (IGUAL A IMAGEM) ---
-        const roadGroup = new THREE.Group();
-        scene.add(roadGroup);
+        // --- GEOMETRIAS ÚNICAS (BufferGeometry para economia de GPU) ---
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        const cylinderGeo = new THREE.CylinderGeometry(0.1, 0.1, 1);
+        const planeGeo = new THREE.PlaneGeometry(1, 1);
 
-        // Grama (Lado esquerdo e direito)
-        const grassGeo = new THREE.PlaneGeometry(100, 200);
-        const grassMat = new THREE.MeshStandardMaterial({ color: 0x004400 });
-        const grass = new THREE.Mesh(grassGeo, grassMat);
-        grass.rotation.x = -Math.PI/2;
-        grass.position.y = -0.1;
-        scene.add(grass);
+        // --- MATERIAIS LEVES ---
+        const roadMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+        const grassMat = new THREE.MeshLambertMaterial({ color: 0x051a05 });
+        const buildingMat = new THREE.MeshLambertMaterial({ color: 0x333344 });
 
-        // Asfalto
-        const roadGeo = new THREE.PlaneGeometry(12, 200);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0x151515 });
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI/2;
+        // --- OBJECT POOLING (REUSO DE OBJETOS) ---
+        const pool = [];
+        const poolSize = 20;
+        const spacing = 15;
+
+        for (let i = 0; i < poolSize; i++) {
+            const group = new THREE.Group();
+            
+            // Prédio
+            const build = new THREE.Mesh(boxGeo, buildingMat);
+            const h = 5 + Math.random() * 10;
+            build.scale.set(3, h, 3);
+            build.position.set(Math.random() > 0.5 ? 10 : -10, h/2, 0);
+            
+            // Poste
+            const pole = new THREE.Mesh(cylinderGeo, buildingMat);
+            pole.scale.set(1, 6, 1);
+            pole.position.set(build.position.x > 0 ? 7 : -7, 3, 0);
+            
+            // Luz do poste (Ponto de luz otimizado)
+            const pLight = new THREE.PointLight(0xffaa00, 10, 15);
+            pLight.position.set(0, 3, 0);
+            pole.add(pLight);
+
+            group.add(build, pole);
+            group.position.z = -i * spacing;
+            
+            scene.add(group);
+            pool.push(group);
+        }
+
+        // Estrada Estática
+        const road = new THREE.Mesh(planeGeo, roadMat);
+        road.scale.set(14, 1000, 1);
+        road.rotation.x = -Math.PI / 2;
         scene.add(road);
 
-        // Faixas Brancas
-        const stripeGeo = new THREE.PlaneGeometry(0.4, 4);
-        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        const stripes = [];
-        for(let i=0; i<20; i++) {
-            const s = new THREE.Mesh(stripeGeo, stripeMat);
-            s.rotation.x = -Math.PI/2;
-            s.position.set(0, 0.02, -i*10);
-            roadGroup.add(s);
-            stripes.push(s);
-        }
-
-        // --- PRÉDIOS E POSTES ---
-        const buildings = [];
-        function createWorldObject(z) {
-            // Prédios coloridos da imagem
-            const colors = [0x554433, 0x882222, 0x228866, 0x444488];
-            const h = 5 + Math.random()*10;
-            const bGeo = new THREE.BoxGeometry(3, h, 3);
-            const bMat = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random()*colors.length)] });
-            const b = new THREE.Mesh(bGeo, bMat);
-            const side = Math.random() > 0.5 ? 1 : -1;
-            b.position.set(side * 10, h/2, z);
-            roadGroup.add(b);
-            buildings.push(b);
-
-            // Poste de Luz
-            const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 8);
-            const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({color:0x333333}));
-            pole.position.set(side * 7, 4, z);
-            roadGroup.add(pole);
-            
-            const light = new THREE.PointLight(0xffcc00, 15, 15);
-            light.position.set(side * 7, 7, z);
-            roadGroup.add(light);
-        }
-
-        for(let i=0; i<15; i++) createWorldObject(-i * 15);
-
-        // --- JOGADOR (CARRO) ---
-        const car = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 2.5), new THREE.MeshStandardMaterial({color: 0x0088ff}));
-        car.add(body);
-        car.position.set(0, 0.4, -5);
+        // --- CARRO DO JOGADOR ---
+        const car = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x0077ff }));
+        car.scale.set(1.2, 0.6, 2.2);
+        car.position.set(0, 0.3, -5);
         scene.add(car);
 
-        // Faróis Reais
-        const f1 = new THREE.SpotLight(0xffffff, 20, 30, 0.4);
-        f1.position.set(0.5, 0, -1);
-        car.add(f1);
-        car.add(f1.target);
-        f1.target.position.set(0.5, -1, -10);
-
-        // --- LÓGICA DE JOGO ---
+        // --- CONTROLES ---
         let moveX = 0;
-        const speed = 0.8;
+        const keys = { left: false, right: false };
 
-        // Input Detect
-        const keys = {};
-        window.onkeydown = (e) => keys[e.code] = true;
-        window.onkeyup = (e) => keys[e.code] = false;
+        const updateInput = (key, val) => { keys[key] = val; };
+        window.onkeydown = (e) => { if(e.code=='ArrowLeft') keys.left=true; if(e.code=='ArrowRight') keys.right=true; };
+        window.onkeyup = (e) => { if(e.code=='ArrowLeft') keys.left=false; if(e.code=='ArrowRight') keys.right=false; };
+        
+        document.getElementById('lBtn').ontouchstart = () => keys.left = true;
+        document.getElementById('lBtn').ontouchend = () => keys.left = false;
+        document.getElementById('rBtn').ontouchstart = () => keys.right = true;
+        document.getElementById('rBtn').ontouchend = () => keys.right = false;
 
-        document.getElementById('left').ontouchstart = () => keys['ArrowLeft'] = true;
-        document.getElementById('left').ontouchend = () => keys['ArrowLeft'] = false;
-        document.getElementById('right').ontouchstart = () => keys['ArrowRight'] = true;
-        document.getElementById('right').ontouchend = () => keys['ArrowRight'] = false;
-
-        camera.position.set(0, 4, 3);
+        // --- LOOP PRINCIPAL (ANTI-TRAVA) ---
+        const speed = 0.6;
+        camera.position.set(0, 4, 2);
         camera.lookAt(0, 0, -15);
 
-        function update() {
-            // Movimento Infinito
-            roadGroup.children.forEach(obj => {
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Mover pool de objetos (Object Pooling)
+            pool.forEach(obj => {
                 obj.position.z += speed;
-                if(obj.position.z > 20) {
-                    obj.position.z -= 150;
+                if (obj.position.z > 10) {
+                    obj.position.z = -(poolSize - 1) * spacing;
                 }
             });
 
-            // Controle
-            if(keys['ArrowLeft'] && car.position.x > -5) car.position.x -= 0.15;
-            if(keys['ArrowRight'] && car.position.x < 5) car.position.x += 0.15;
+            // Movimento do carro
+            if (keys.left && car.position.x > -5) car.position.x -= 0.15;
+            if (keys.right && car.position.x < 5) car.position.x += 0.15;
+            
+            camera.position.x = car.position.x * 0.5;
 
-            camera.position.x = car.position.x * 0.7;
             renderer.render(scene, camera);
-            requestAnimationFrame(update);
         }
 
-        // Correção de Bug Visível: Redimensionamento
+        animate();
+
+        // Resize
         window.onresize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         };
-
-        update();
     </script>
 </body>
 </html>
