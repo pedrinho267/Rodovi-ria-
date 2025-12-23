@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Highway - Ultra Slow Edition</title>
+    <title>Midnight Drive - Velocidade 1</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; margin: 0 auto; }
@@ -15,41 +15,39 @@
         }
 
         .overlay {
-            background: rgba(0,0,0,0.95); color: white; padding: 40px;
-            text-align: center; border-radius: 20px; border: 2px solid #5bc0de;
-            pointer-events: auto; box-shadow: 0 0 30px rgba(91, 192, 222, 0.3);
+            background: rgba(0,0,0,0.9); color: white; padding: 40px;
+            text-align: center; border-radius: 15px; border: 1px solid #444;
+            pointer-events: auto;
         }
 
         button {
-            background: #5bc0de; border: none; padding: 12px 40px;
-            font-size: 20px; color: white; cursor: pointer; border-radius: 8px;
-            margin-top: 20px; font-weight: bold; transition: 0.4s;
+            background: #222; border: 1px solid #555; padding: 10px 30px;
+            font-size: 18px; color: #fff; cursor: pointer; border-radius: 5px;
+            margin-top: 20px; transition: 0.3s;
         }
 
-        button:hover { background: #31b0d5; letter-spacing: 2px; }
+        button:hover { background: #444; }
 
         #hud {
-            position: absolute; top: 20px; left: 20px; color: #fff;
-            font-size: 24px; font-weight: 300; letter-spacing: 2px;
-            z-index: 100;
+            position: absolute; top: 20px; left: 20px; color: #aaa;
+            font-size: 20px; letter-spacing: 3px; z-index: 100;
         }
     </style>
 </head>
 <body>
 
-<div id="hud">KM: 0</div>
+<div id="hud">VELOCIDADE: 1</div>
 
 <div id="ui-layer">
     <div id="menu" class="overlay">
-        <h1 style="color: #5bc0de; font-weight: 300;">SLOW DRIVE</h1>
-        <p>Um passeio tranquilo pela estrada noturna.</p>
-        <button onclick="startGame()">COMEÇAR PASSEIO</button>
+        <h1>MODO LENTO</h1>
+        <p>Aproveite a paisagem. Use as setas para mover.</p>
+        <button onclick="startGame()">INICIAR</button>
     </div>
 
     <div id="game-over" class="overlay" style="display:none;">
-        <h1 style="color: #ff4d4d;">OPS!</h1>
-        <p id="final-score">Distância: 0</p>
-        <button onclick="startGame()">VOLTAR AO PASSEIO</button>
+        <h1 style="color: #ff4d4d;">FIM</h1>
+        <button onclick="startGame()">VOLTAR</button>
     </div>
 </div>
 
@@ -60,19 +58,18 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
-const scoreLabel = document.getElementById('hud');
+const hud = document.getElementById('hud');
 
 let width, height, horizon;
 let playerX = 0; 
 let roadOffset = 0;
-let score = 0;
 let isRunning = false;
 let obstacles = [];
 let scenery = [];
 
-// --- VELOCIDADE ULTRA LENTA ---
-const GAME_SPEED = 4; 
-const PLAYER_SENSITIVITY = 0.025; 
+// --- VELOCIDADE SOLICITADA: 1 ---
+const GAME_SPEED = 1; 
+const PLAYER_SENSITIVITY = 0.015; 
 
 function resize() {
     width = window.innerWidth;
@@ -86,7 +83,6 @@ window.addEventListener('resize', resize);
 resize();
 
 function startGame() {
-    score = 0;
     playerX = 0;
     roadOffset = 0;
     obstacles = [];
@@ -95,18 +91,18 @@ function startGame() {
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Inicializa cenário lateral
-    for(let i = 0; i < 25; i++) {
-        addScenery(i * 60);
+    // Criar o mundo inicial
+    for(let i = 0; i < 30; i++) {
+        addScenery(i * 40);
     }
     
     animate();
 }
 
 function addScenery(z) {
-    // Prédios bem afastados da pista cinza
-    const side = Math.random() > 0.5 ? (1.6 + Math.random()) : (-1.6 - Math.random());
-    const colors = ['#3d2b1f', '#4a2424', '#1e332a', '#24243d'];
+    // Prédios fora da estrada (x > 1.4 ou x < -1.4)
+    const side = Math.random() > 0.5 ? (1.5 + Math.random()) : (-1.5 - Math.random());
+    const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
     scenery.push({
         z: z,
         x: side,
@@ -123,19 +119,17 @@ function animate() {
     if(!isRunning) return;
 
     roadOffset += GAME_SPEED;
-    score += 0.5;
-    scoreLabel.innerText = `KM: ${Math.floor(score/10)}`;
 
     if(keys['ArrowLeft']) playerX -= PLAYER_SENSITIVITY;
     if(keys['ArrowRight']) playerX += PLAYER_SENSITIVITY;
     playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    // Gerar obstáculos raramente (estrada calma)
-    if(Math.floor(score) % 150 === 0) {
+    // Adicionar tráfego raramente na pista
+    if(Math.random() < 0.005) {
         obstacles.push({
             z: 1000, 
             x: (Math.random() * 1.4) - 0.7, 
-            type: Math.random() > 0.3 ? 'car' : 'bus'
+            type: Math.random() > 0.2 ? 'car' : 'bus'
         });
     }
 
@@ -144,41 +138,34 @@ function animate() {
 }
 
 function render() {
-    // Céu
+    // Fundo Negro
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, horizon);
     
-    // Grama muito escura
-    ctx.fillStyle = "#0d1a00";
+    // Grama Verde Escura
+    ctx.fillStyle = "#0a1400";
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Estrada Principal
-    ctx.fillStyle = "#1a1a1a";
+    // Estrada (Cinza)
+    ctx.fillStyle = "#111";
     ctx.beginPath();
-    ctx.moveTo(width/2 - 25, horizon);
-    ctx.lineTo(width/2 + 25, horizon);
-    ctx.lineTo(width * 1.2, height);
-    ctx.lineTo(width * -0.2, height);
+    ctx.moveTo(width/2 - 20, horizon);
+    ctx.lineTo(width/2 + 20, horizon);
+    ctx.lineTo(width * 1.3, height);
+    ctx.lineTo(width * -0.3, height);
     ctx.fill();
 
-    // Faixas Laterais
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(width/2 - 25, horizon); ctx.lineTo(width * -0.15, height);
-    ctx.moveTo(width/2 + 25, horizon); ctx.lineTo(width * 1.15, height);
-    ctx.stroke();
-
-    // Faixa central lenta
-    ctx.setLineDash([15, 60]);
-    ctx.lineDashOffset = -roadOffset * 1.2;
+    // Faixa Central Tracejada
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.setLineDash([10, 50]);
+    ctx.lineDashOffset = -roadOffset * 1.1;
     ctx.beginPath();
     ctx.moveTo(width/2, horizon);
     ctx.lineTo(width/2, height);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Ordenar objetos por profundidade
+    // Sort e Desenho dos Objetos
     const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
 
     allObjects.forEach(obj => {
@@ -186,11 +173,10 @@ function render() {
         
         if(obj.z < 1) {
             obj.z = 1000;
-            if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.4) - 0.7;
             return;
         }
 
-        const scale = 35 / obj.z;
+        const scale = 30 / obj.z;
         const xPos = width/2 + (obj.x - playerX) * scale * 250;
         const yPos = horizon + (scale * 300);
         const size = scale * 80;
@@ -198,45 +184,44 @@ function render() {
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-            // Janelas foscas
-            ctx.fillStyle = "rgba(255, 255, 150, 0.2)";
-            ctx.fillRect(xPos - size/2, yPos - size*3.5, size/5, size/5);
+            // Janela única
+            ctx.fillStyle = "rgba(255, 255, 100, 0.1)";
+            ctx.fillRect(xPos - size/4, yPos - size*3, size/2, size/2);
         } 
         else if(obj.type === 'lamp') {
-            ctx.fillStyle = "#444";
+            ctx.fillStyle = "#333";
             ctx.fillRect(xPos - 1, yPos - size*3, 2, size*3);
-            ctx.fillStyle = "rgba(255, 255, 200, 0.4)";
-            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*12, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "rgba(255, 250, 150, 0.3)";
+            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*10, 0, Math.PI*2); ctx.fill();
         }
         else {
-            // NPCs lentos
-            ctx.fillStyle = obj.type === 'bus' ? "#802b2b" : "#997300";
+            // Veículos na pista
+            ctx.fillStyle = obj.type === 'bus' ? "#732626" : "#8c6600";
             ctx.fillRect(xPos - size/2, yPos - size/2, size, size/2);
             
-            // Colisão generosa (menos rigorosa por ser lento)
-            if(obj.z < 50 && obj.z > 15 && Math.abs(obj.x - playerX) < 0.3) {
+            // Colisão
+            if(obj.z < 40 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.3) {
                 endGame();
             }
         }
     });
 
-    // Carro do Jogador (Azul)
-    const pSize = 90;
+    // Carro Azul do Jogador
+    const pSize = 80;
     const px = width/2;
-    const py = height - 100;
+    const py = height - 80;
     
-    ctx.fillStyle = "#0066aa"; // Azul mais sóbrio
-    ctx.fillRect(px - pSize/2, py - 20, pSize, 35); 
-    ctx.fillStyle = "#000"; // Vidro
-    ctx.fillRect(px - pSize/2 + 15, py - 15, pSize - 30, 8);
+    ctx.fillStyle = "#004d80"; // Azul escuro
+    ctx.fillRect(px - pSize/2, py, pSize, 30); 
+    ctx.fillStyle = "#000"; // Vidro traseiro
+    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, 8);
 }
 
 function endGame() {
     isRunning = false;
     gameOverScreen.style.display = 'block';
-    document.getElementById('final-score').innerText = `Distância percorrida: ${Math.floor(score/10)} KM`;
 }
 </script>
 
 </body>
-</html>
+    </html>
