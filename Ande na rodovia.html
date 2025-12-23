@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jogo de Rodovia</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; }
+        canvas { display: block; margin: 0 auto; background: #444; }
+        #ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; font-size: 20px; text-align: center; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="ui">Pontuação: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+
+    canvas.width = 400;
+    canvas.height = 600;
+
+    let score = 0;
+    let gameActive = true;
+
+    const player = {
+        x: 175,
+        y: 500,
+        w: 50,
+        h: 80,
+        color: '#3498db',
+        speed: 5
+    };
+
+    const enemies = [];
+    const enemySpeed = 3;
+
+    function spawnEnemy() {
+        const lanes = [50, 150, 250, 300];
+        const x = lanes[Math.floor(Math.random() * lanes.length)];
+        enemies.push({ x: x, y: -100, w: 50, h: 80, color: '#e74c3c' });
+    }
+
+    setInterval(() => { if(gameActive) spawnEnemy(); }, 1200);
+
+    function update() {
+        if (!gameActive) return;
+
+        score++;
+        scoreElement.innerText = score;
+
+        enemies.forEach((enemy, index) => {
+            enemy.y += enemySpeed;
+            
+            // Colisão
+            if (player.x < enemy.x + enemy.w && player.x + player.w > enemy.x &&
+                player.y < enemy.y + enemy.h && player.y + player.h > enemy.y) {
+                gameActive = false;
+                alert("Game Over! Pontuação: " + score);
+                location.reload();
+            }
+
+            if (enemy.y > canvas.height) enemies.splice(index, 1);
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Estrada
+        ctx.fillStyle = "#555";
+        ctx.fillRect(50, 0, 300, canvas.height);
+        
+        // Linhas da estrada
+        ctx.strokeStyle = "white";
+        ctx.setLineDash([20, 20]);
+        ctx.beginPath();
+        ctx.moveTo(150, 0); ctx.lineTo(150, canvas.height);
+        ctx.moveTo(250, 0); ctx.lineTo(250, canvas.height);
+        ctx.stroke();
+
+        // Jogador
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.w, player.h);
+
+        // Inimigos
+        enemies.forEach(enemy => {
+            ctx.fillStyle = enemy.color;
+            ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+        });
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "ArrowLeft" && player.x > 50) player.x -= 50;
+        if (e.key === "ArrowRight" && player.x < 300) player.x += 50;
+    });
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
+</body>
+</html>
