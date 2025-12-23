@@ -3,170 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Night Drive</title>
+    <title>Midnight Drive 3D - Fiel à Foto</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; pointer-events: none; }
-        #instructions { position: absolute; bottom: 20px; width: 100%; text-align: center; color: white; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #00ff00; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #000; }
+        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: white; font-size: 12px; opacity: 0.5; }
     </style>
 </head>
 <body>
-    <div id="ui">Pontos: <span id="score">0</span></div>
-    <div id="instructions">Use as SETAS ou TOQUE nas laterais da tela</div>
+    <div id="ui">SCORE: <span id="score">0</span></div>
+    <div id="controles">PC: SETAS | MOBILE: TOQUE LATERAIS</div>
 
     <script type="module">
         import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 
-        // --- CONFIGURAÇÃO DA CENA ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x000000, 10, 50); // Neblina para o horizonte escuro
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 20, 100);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- ELEMENTOS DO CENÁRIO (IGUAL À FOTO) ---
-        // Estrada
-        const roadGeo = new THREE.PlaneGeometry(20, 1000);
-        const roadMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        scene.add(road);
+        // --- AMBIENTE (ESTRADA E GRAMA) ---
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
 
-        // Grama lateral
-        const grassGeo = new THREE.PlaneGeometry(100, 1000);
-        const grassMat = new THREE.MeshPhongMaterial({ color: 0x004400 });
-        const grass = new THREE.Mesh(grassGeo, grassMat);
-        grass.rotation.x = -Math.PI / 2;
-        grass.position.y = -0.1;
-        scene.add(grass);
+        function createFloor() {
+            const planeGeo = new THREE.PlaneGeometry(100, 200);
+            const planeMat = new THREE.MeshPhongMaterial({ color: 0x003300 }); // Grama verde escuro
+            const floor = new THREE.Mesh(planeGeo, planeMat);
+            floor.rotation.x = -Math.PI / 2;
+            worldGroup.add(floor);
 
-        // Iluminação
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-        scene.add(ambientLight);
+            // Asfalto
+            const roadGeo = new THREE.PlaneGeometry(14, 200);
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.position.y = 0.01;
+            floor.add(road);
 
-        // Criar o Carro do Jogador (Azul da foto)
-        const playerGroup = new THREE.Group();
-        const bodyGeo = new THREE.BoxGeometry(1, 0.6, 2);
-        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x00aaff });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        playerGroup.add(body);
-        
-        // Faróis do jogador
-        const headlight = new THREE.SpotLight(0xffffff, 2);
-        headlight.position.set(0, 0, 1);
-        playerGroup.add(headlight);
+            // Faixas centrais azuis (detalhe da sua foto)
+            const blueLineGeo = new THREE.PlaneGeometry(0.3, 200);
+            const blueLineMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            const line1 = new THREE.Mesh(blueLineGeo, blueLineMat);
+            line1.position.set(-0.5, 0.02, 0);
+            floor.add(line1);
+            const line2 = new THREE.Mesh(blueLineGeo, blueLineMat);
+            line2.position.set(0.5, 0.02, 0);
+            floor.add(line2);
+            
+            // Faixas brancas pontilhadas
+            for(let i = -100; i < 100; i += 10) {
+                const stripeGeo = new THREE.PlaneGeometry(0.5, 5);
+                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const s = new THREE.Mesh(stripeGeo, stripeMat);
+                s.position.set(0, 0.03, i);
+                floor.add(s);
+            }
+        }
+        createFloor();
 
-        scene.add(playerGroup);
-        playerGroup.position.y = 0.4;
-        playerGroup.position.z = 5;
+        // --- POSTES DE LUZ (IGUAL À FOTO) ---
+        function createStreetLight(z) {
+            const pole = new THREE.Group();
+            const stick = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
+            stick.position.y = 4;
+            pole.add(stick);
 
-        // --- SISTEMA DE OBSTÁCULOS E AMBIENTE ---
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.2), new THREE.MeshPhongMaterial({color: 0x555555}));
+            arm.position.set(-1, 8, 0);
+            pole.add(arm);
+
+            const light = new THREE.PointLight(0xffffaa, 5, 15);
+            light.position.set(-2, 7.5, 0);
+            pole.add(light);
+
+            pole.position.set(8, 0, z);
+            worldGroup.add(pole);
+        }
+
+        for(let i = 0; i > -200; i -= 30) {
+            createStreetLight(i);
+            createStreetLight(i + 15);
+        }
+
+        // --- JOGADOR (CARRO AZUL) ---
+        const player = new THREE.Group();
+        const carBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 2.2), new THREE.MeshPhongMaterial({color: 0x00ccff}));
+        carBody.position.y = 0.5;
+        player.add(carBody);
+        scene.add(player);
+        player.position.set(-3, 0, 10);
+
+        // --- INIMIGOS E OBSTÁCULOS ---
         const obstacles = [];
-        const buildings = [];
-
-        function createBuilding(zPos, side) {
-            const colors = [0x8b4513, 0x008080, 0x4682b4, 0xd2691e];
-            const h = 5 + Math.random() * 5;
-            const geo = new THREE.BoxGeometry(2, h, 2);
-            const mat = new THREE.MeshPhongMaterial({ color: colors[Math.floor(Math.random()*colors.length)] });
-            const b = new THREE.Mesh(geo, mat);
-            b.position.set(side * 8, h/2, zPos);
-            scene.add(b);
-            buildings.push(b);
-        }
-
-        function createObstacle() {
+        function spawnEnemy() {
             const isBus = Math.random() > 0.7;
-            const geo = isBus ? new THREE.BoxGeometry(1.2, 1.2, 4) : new THREE.BoxGeometry(1, 0.6, 2);
-            const mat = new THREE.MeshPhongMaterial({ color: isBus ? 0xff3333 : 0xffff00 });
-            const obs = new THREE.Mesh(geo, mat);
-            obs.position.set((Math.random() - 0.5) * 10, isBus ? 0.6 : 0.4, -50);
-            scene.add(obs);
-            obstacles.push(obs);
+            const color = isBus ? 0xff0000 : (Math.random() > 0.5 ? 0xffff00 : 0xff00ff);
+            const geo = isBus ? new THREE.BoxGeometry(1.5, 1.5, 5) : new THREE.BoxGeometry(1.2, 0.7, 2.2);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color: color}));
+            
+            const lane = (Math.floor(Math.random() * 2) === 0) ? -3.5 : 3.5;
+            mesh.position.set(lane, isBus ? 0.75 : 0.5, -80);
+            scene.add(mesh);
+            obstacles.push(mesh);
         }
 
-        // --- LÓGICA DO JOGO ---
+        // --- LÓGICA ---
         let score = 0;
-        const speed = 0.5;
+        let speed = 0.8;
         const keys = { left: false, right: false };
 
-        window.addEventListener('keydown', (e) => {
-            if(e.key === "ArrowLeft") keys.left = true;
-            if(e.key === "ArrowRight") keys.right = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            if(e.key === "ArrowLeft") keys.left = false;
-            if(e.key === "ArrowRight") keys.right = false;
-        });
+        window.onkeydown = (e) => { 
+            if(e.code == "ArrowLeft") keys.left = true;
+            if(e.code == "ArrowRight") keys.right = true;
+        };
+        window.onkeyup = (e) => { 
+            if(e.code == "ArrowLeft") keys.left = false;
+            if(e.code == "ArrowRight") keys.right = false;
+        };
 
-        // Touch para Mobile
-        window.addEventListener('touchstart', (e) => {
+        // Mobile
+        window.ontouchstart = (e) => {
             if(e.touches[0].clientX < window.innerWidth/2) keys.left = true;
             else keys.right = true;
-        });
-        window.addEventListener('touchend', () => { keys.left = false; keys.right = false; });
+        };
+        window.ontouchend = () => { keys.left = false; keys.right = false; };
 
-        function animate() {
-            requestAnimationFrame(animate);
+        function update() {
+            requestAnimationFrame(update);
 
-            // Movimento do jogador
-            if(keys.left && playerGroup.position.x > -8) playerGroup.position.x -= 0.15;
-            if(keys.right && playerGroup.position.x < 8) playerGroup.position.x += 0.15;
+            // Movimento do mundo (Loop infinito)
+            worldGroup.position.z += speed;
+            if(worldGroup.position.z > 50) worldGroup.position.z = 0;
 
-            // Movimentar estrada (ilusão de ótica)
-            road.position.z += speed;
-            if(road.position.z > 100) road.position.z = 0;
+            // Movimento Jogador
+            if(keys.left && player.position.x > -5) player.position.x -= 0.2;
+            if(keys.right && player.position.x < 5) player.position.x += 0.2;
 
-            // Gerar prédios e inimigos
-            if(Math.random() < 0.05) {
-                createBuilding(-100, Math.random() > 0.5 ? 1 : -1);
-            }
-            if(Math.random() < 0.02) createObstacle();
-
-            // Atualizar obstáculos
-            obstacles.forEach((obs, index) => {
-                obs.position.z += speed;
+            // Obstáculos
+            if(Math.random() < 0.03) spawnEnemy();
+            
+            obstacles.forEach((obj, i) => {
+                obj.position.z += speed;
                 
-                // Colisão simples
-                if(Math.abs(obs.position.z - playerGroup.position.z) < 1.5 && 
-                   Math.abs(obs.position.x - playerGroup.position.x) < 1) {
-                    alert("Gamer Over! Pontos: " + score);
-                    location.reload();
-                }
-
-                if(obs.position.z > 10) {
-                    scene.remove(obs);
-                    obstacles.splice(index, 1);
-                    score++;
-                    document.getElementById('score').innerText = score;
-                }
-            });
-
-            // Atualizar prédios
-            buildings.forEach((b, index) => {
-                b.position.z += speed;
-                if(b.position.z > 20) {
-                    scene.remove(b);
-                    buildings.splice(index, 1);
-                }
-            });
-
-            camera.position.set(playerGroup.position.x * 0.5, 3, 12);
-            camera.lookAt(playerGroup.position.x, 0, -5);
-
-            renderer.render(scene, camera);
-        }
-
-        animate();
-
-        // Ajuste de tela
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
+                // Colisão
+                const
