@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Highway Pro</title>
+    <title>Retro Highway Traffic</title>
     <style>
         :root { --neon-blue: #3498db; --neon-red: #e74c3c; }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
@@ -44,7 +44,7 @@
         <div id="score-box">SCORE: <span id="score-val">0</span></div>
         
         <div id="main-menu" class="overlay">
-            <h1>RETRO DRIVE</h1>
+            <h1>TRAFFIC DRIVE</h1>
             <button onclick="startGame()">JOGAR</button>
         </div>
 
@@ -65,8 +65,8 @@
     let speed = 0;
     let cameraZ = 0;
     let spawnTimer = 0;
-    const INITIAL_SPEED = 12.0;
-    const ACCELERATION = 0.35;
+    const INITIAL_SPEED = 14.0;
+    const ACCELERATION = 0.4;
 
     const player = { x: 0, targetX: 0, lerpCoeff: 10 };
     let obstacles = [];
@@ -121,27 +121,38 @@
         ctx.fill();
     }
 
-    function drawCar(x, y, size, isPlayer) {
+    // Função para desenhar o Carro do Jogador e Tráfego
+    function drawCar(x, y, size, color, isPlayer) {
         ctx.save();
         ctx.translate(x, y);
+        // Rodas
         ctx.fillStyle = "#111";
         ctx.fillRect(-size/1.8, -size/1.5, size/4, size/3);
         ctx.fillRect(size/3, -size/1.5, size/4, size/3);
-        ctx.fillStyle = isPlayer ? "#3498db" : "#e74c3c";
+        // Carroceria
+        ctx.fillStyle = color;
         ctx.fillRect(-size/2, -size/2, size, size/2.5);
+        // Vidro
         ctx.fillStyle = "#87ceeb";
         ctx.fillRect(-size/3, -size/1.3, size/1.5, size/4);
         ctx.restore();
     }
 
-    function drawRock(x, y, size) {
-        ctx.fillStyle = "#555";
-        ctx.beginPath();
-        ctx.moveTo(x - size/2, y);
-        ctx.lineTo(x - size/4, y - size*0.8);
-        ctx.lineTo(x + size/3, y - size);
-        ctx.lineTo(x + size/2, y);
-        ctx.fill();
+    // Função para desenhar o Ônibus
+    function drawBus(x, y, size, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        // Rodas
+        ctx.fillStyle = "#111";
+        ctx.fillRect(-size/1.6, -size/1.2, size/4, size/2);
+        ctx.fillRect(size/2.5, -size/1.2, size/4, size/2);
+        // Corpo do Ônibus (Mais alto e longo)
+        ctx.fillStyle = color;
+        ctx.fillRect(-size/1.5, -size * 1.2, size * 1.3, size);
+        // Janelas Laterais/Frontal
+        ctx.fillStyle = "#222";
+        ctx.fillRect(-size/1.8, -size * 1.1, size * 1.1, size/3);
+        ctx.restore();
     }
 
     function update(dt) {
@@ -155,38 +166,47 @@
         if (keys.left) player.targetX -= 4.0 * dt;
         if (keys.right) player.targetX += 4.0 * dt;
         
-        // Limite lateral da pista ajustado para a nova largura
         player.targetX = Math.max(-0.9, Math.min(0.9, player.targetX));
         player.x += (player.targetX - player.x) * (1 - Math.exp(-player.lerpCoeff * dt));
 
         spawnTimer += dt;
-        const spawnInterval = Math.max(0.2, 0.8 - (speed * 0.01)); 
+        const spawnInterval = Math.max(0.2, 1.0 - (speed * 0.01)); 
         if (spawnTimer > spawnInterval) {
-            // Lógica de 3 faixas espalhadas na pista larga
-            const lanes = [-0.7, 0, 0.7];
-            obstacles.push({ x: lanes[Math.floor(Math.random()*3)], z: cameraZ + 60 });
+            const lanes = [-0.75, 0, 0.75];
+            const type = Math.random() > 0.7 ? 'BUS' : 'CAR';
+            const colors = ['#2ecc71', '#9b59b6', '#f39c12', '#e67e22'];
+            obstacles.push({ 
+                x: lanes[Math.floor(Math.random()*3)], 
+                z: cameraZ + 70, 
+                type: type,
+                color: colors[Math.floor(Math.random()*colors.length)]
+            });
             spawnTimer = 0;
         }
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             const obs = obstacles[i];
             const distZ = obs.z - cameraZ;
-            // Colisão ajustada para pedra menor
-            if (distZ < 0.5 && distZ > 0) {
-                if (Math.abs(player.x - obs.x) < 0.25) gameOver();
+            
+            // Lógica de colisão baseada no tipo de veículo
+            if (distZ < 0.6 && distZ > 0) {
+                const hitWidth = obs.type === 'BUS' ? 0.4 : 0.3;
+                if (Math.abs(player.x - obs.x) < hitWidth) gameOver();
             }
             if (distZ < -2) obstacles.splice(i, 1);
         }
     }
 
     function draw() {
+        // Céu
         ctx.fillStyle = "#0c0c1e";
         ctx.fillRect(0, 0, width, halfH);
+        // Grama
         ctx.fillStyle = "#1e392a";
         ctx.fillRect(0, halfH, width, halfH);
 
         const segments = 50;
-        const roadWidth = 1.2; // ESTRADA MAIS GROSSA
+        const roadWidth = 1.2;
 
         for (let i = segments; i > 0; i--) {
             const z1 = Math.floor(cameraZ) + i;
@@ -199,16 +219,19 @@
 
             if (p1.w === 0 || p2.w === 0) continue;
 
+            // Asfalto
             ctx.fillStyle = (z1 % 2 === 0) ? "#222" : "#282828";
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
             ctx.fill();
 
+            // Bordas
             ctx.fillStyle = "#fff";
             drawSegmentLine(p1, p2, p1.w * 0.04);
             drawSegmentLine(p4, p3, p1.w * 0.04);
 
+            // Faixa Central
             if (z1 % 2 === 0) {
                 ctx.fillStyle = "#f1c40f";
                 const m1 = project(0, 0.5, z1);
@@ -217,14 +240,22 @@
             }
         }
 
+        // Desenhar Tráfego
         obstacles.forEach(obs => {
             const p = project(obs.x, 0.5, obs.z);
-            if (p.w > 1 && p.y > halfH) drawRock(p.x, p.y, p.w * 0.4); // PEDRA MENOR
+            if (p.w > 1 && p.y > halfH) {
+                if (obs.type === 'BUS') {
+                    drawBus(p.x, p.y, p.w * 0.6, obs.color);
+                } else {
+                    drawCar(p.x, p.y, p.w * 0.5, obs.color, false);
+                }
+            }
         });
 
+        // Carro do Jogador
         const playerSize = width * 0.15;
         const playerScreenX = halfW + (player.x * (width * 0.4));
-        drawCar(playerScreenX, height - 80, playerSize, true);
+        drawCar(playerScreenX, height - 80, playerSize, "#3498db", true);
     }
 
     let lastTime = performance.now();
