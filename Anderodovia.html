@@ -3,24 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Day Drive - Final</title>
+    <title>Motorista 3D - Versão Corrigida</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; touch-action: none; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 30px; pointer-events: none; text-shadow: 2px 2px #555; z-index: 10; }
-        #controles { position: absolute; bottom: 10px; width: 100%; text-align: center; color: #444; font-size: 14px; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none; z-index: 10; }
+        #msg { position: absolute; top: 50%; width: 100%; text-align: center; color: white; font-size: 20px; display: none; background: rgba(0,0,0,0.7); padding: 20px 0; }
     </style>
 </head>
 <body>
-    <div id="ui">PONTOS: <span id="score">0</span></div>
-    <div id="controles">PC: SETAS | MOBILE: TOQUE NAS LATERAIS</div>
+    <div id="ui">SCORE: <span id="score">0</span></div>
+    <div id="msg">BATIDA! Reiniciando...</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
 
     <script type="module">
-        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+        import * as THREE from 'three';
 
-        // --- CONFIGURAÇÃO BÁSICA ---
+        // CONFIGURAÇÕES
+        let score = 0;
+        let speed = 0.8;
+        let gameActive = true;
+        const obstacles = [];
+        const buildings = [];
+        const keys = { Left: false, Right: false };
+
+        // CENA
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 50, 150);
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true
+        camera.position.set(0, 5, 15);
+        camera.lookAt(0, 0, -5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // LUZES
+        const light = new THREE.DirectionalLight(0xffffff, 1.5);
+        light.position.set(10, 20, 10);
+        light.castShadow = true;
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+        // CHÃO E ESTRADA
+        const world = new THREE.Group();
+        scene.add(world);
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(200, 1000),
+            new THREE.MeshPhongMaterial({ color: 0x228B22 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        world.add(ground);
+
+        const road = new THREE.Mesh(
+            new THREE.PlaneGeometry(12, 1000),
+            new THREE.MeshPhongMaterial({ color: 0x333333 })
+        );
+        road.position.y = 0.05;
+        ground.add(road);
+
+        // Faixas Centrais Azuis (Detalhe da sua foto)
+        for(let x of [-0.4, 0.4]) {
+            const line = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.2, 1000),
+                new THREE.MeshBasicMaterial({ color: 0x0000ff })
+            );
+            line.position.set(x, 0.1, 0);
+            ground.add(line);
+        }
+
+        // CARRO DO JOGADOR
+        const player = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2, 0.6, 2),
+            new THREE.MeshPhongMaterial({ color: 0x00aaff })
+        );
+        player.position.set(0, 0.35, 8);
+        player.castShadow = true;
+        scene.add(player);
+
+        // FUNÇÃO PARA CRIAR OBSTÁCULOS (CARROS E ÔNIBUS)
+        function spawnObstacle() {
+            const isBus = Math.random() > 0.7;
+            const h = isBus ? 1.4 : 0.6;
+            const l = isBus ? 4.5 : 2;
+            const color = isBus ? 0xff0000 : (Math.random() > 0.5 ? 0xffff00 : 0xff00ff);
+            
+            const obs = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, h, l),
+                new THREE.MeshPhongMaterial({ color: color })
+            );
+            obs.position.set(Math.random() > 0.5 ? -3 : 3, h/2, -60);
+            obs.castShadow = true;
+            scene.add(obs);
+            obstacles.push(obs);
+        }
+
+        // CONTROLES
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "ArrowLeft") keys.Left = true;
+            if (e.key === "ArrowRight") keys.Right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === "ArrowLeft") keys.Left = false;
+            if (e.key === "ArrowRight") keys.Right = false;
+        });
+        // Touch Mobile
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches[0].clientX < window.innerWidth/2) keys.Left = true;
+            else keys.Right = true;
+        });
+        window.addEventListener('touchend', () => { keys.Left = false; keys.Right = false; });
+
+        // LOOP DE ANIMAÇÃO
+        function animate() {
+            if (!gameActive) return
