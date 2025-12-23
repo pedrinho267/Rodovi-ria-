@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jogo 3D Realista</title>
+<title>Jogo 3D Estrada</title>
 
 <style>
 body {
@@ -58,7 +58,7 @@ Velocidade: <span id="vel">0</span>
 // CENA
 // ======================
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 10, 150);
+scene.fog = new THREE.Fog(0x000000, 10, 160);
 
 // ======================
 // CÂMERA
@@ -78,10 +78,9 @@ document.body.appendChild(renderer.domElement);
 // ======================
 // LUZES
 // ======================
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-scene.add(ambientLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
-const sun = new THREE.DirectionalLight(0xffffff, 1);
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(5, 10, 5);
 sun.castShadow = true;
 scene.add(sun);
@@ -112,30 +111,6 @@ for (let i = 0; i < 60; i++) {
 }
 
 // ======================
-// PRÉDIOS
-// ======================
-const buildings = [];
-function createBuilding(x, z) {
-    const h = Math.random() * 6 + 4;
-    const b = new THREE.Mesh(
-        new THREE.BoxGeometry(2, h, 2),
-        new THREE.MeshStandardMaterial({
-            color: 0x333333,
-            emissive: 0x111111
-        })
-    );
-    b.position.set(x, h / 2, z);
-    b.castShadow = true;
-    scene.add(b);
-    buildings.push(b);
-}
-
-for (let i = 0; i < 30; i++) {
-    createBuilding(-5, -i * 15);
-    createBuilding(5, -i * 15);
-}
-
-// ======================
 // JOGADOR
 // ======================
 const player = new THREE.Mesh(
@@ -154,29 +129,11 @@ function spawnEnemy() {
         new THREE.BoxGeometry(1, 0.5, 2),
         new THREE.MeshStandardMaterial({ color: 0xff3333 })
     );
-    e.position.set((Math.random() * 4) - 2, 0.25, -150);
+    e.position.set((Math.random() * 4) - 2, 0.25, -180);
     scene.add(e);
     enemies.push(e);
 }
-setInterval(spawnEnemy, 1500);
-
-// ======================
-// CHUVA
-// ======================
-const rain = [];
-for (let i = 0; i < 300; i++) {
-    const drop = new THREE.Mesh(
-        new THREE.SphereGeometry(0.03),
-        new THREE.MeshBasicMaterial({ color: 0x88ccff })
-    );
-    drop.position.set(
-        (Math.random() * 20) - 10,
-        Math.random() * 20,
-        (Math.random() * 100) - 50
-    );
-    scene.add(drop);
-    rain.push(drop);
-}
+setInterval(spawnEnemy, 2000);
 
 // ======================
 // CONTROLES
@@ -188,33 +145,4 @@ addEventListener("keydown", e => {
     if (e.key === "ArrowRight") right = true;
 });
 addEventListener("keyup", e => {
-    if (e.key === "ArrowLeft") left = false;
-    if (e.key === "ArrowRight") right = false;
-});
-addEventListener("touchstart", e => {
-    if (e.touches[0].clientX < innerWidth / 2) left = true;
-    else right = true;
-});
-addEventListener("touchend", () => left = right = false);
-
-// ======================
-// JOGO
-// ======================
-let speed = 0.12;
-let maxSpeed = 1.5;
-let accel = 0.0005;
-let score = 0;
-let gameOver = false;
-
-// ======================
-// LOOP
-// ======================
-function animate() {
-    if (gameOver) return;
-    requestAnimationFrame(animate);
-
-    speed += accel;
-    speed = Math.min(speed, maxSpeed);
-
-    if (left) player.position.x -= 0.1;
-    if (right) player.position
+    if (e.key === "ArrowLeft") left =
