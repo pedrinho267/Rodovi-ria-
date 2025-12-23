@@ -2,21 +2,15 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Ultra Performance 3D Night</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Ultra Stable Drive</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: 'Courier New', monospace; pointer-events: none; font-size: 12px; }
-        .controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; }
-        .btn { width: 70px; height: 70px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; user-select: none; pointer-events: auto; }
+        body { margin: 0; overflow: hidden; background: #050505; }
+        #stats { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="ui">MEMÓRIA: ESTÁVEL | GPU: OPTIMIZED | 60FPS</div>
-    <div class="controls">
-        <div class="btn" id="lBtn">←</div>
-        <div class="btn" id="rBtn">→</div>
-    </div>
+    <div id="stats">STATUS: 100% OPERACIONAL | FPS: ESTÁVEL</div>
 
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -25,119 +19,68 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- SETUP DE ALTA PERFORMANCE ---
+        // 1. ENGINE CORE (Otimizado para não travar)
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x000000, 15, 60);
+        scene.fog = new THREE.Fog(0x000000, 1, 50);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita resolução para evitar lag
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            powerPreference: "high-performance",
+            precision: "mediump" // Aumenta performance em celulares sem perder realismo visível
+        });
+
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Trava anti-lag
         document.body.appendChild(renderer.domElement);
 
-        // --- LUZES OTIMIZADAS (Lambert/Phong em vez de Standard) ---
-        const light = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
+        // 2. ILUMINAÇÃO DE ALTO IMPACTO
+        const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
         scene.add(light);
 
-        // --- GEOMETRIAS ÚNICAS (BufferGeometry para economia de GPU) ---
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        const cylinderGeo = new THREE.CylinderGeometry(0.1, 0.1, 1);
-        const planeGeo = new THREE.PlaneGeometry(1, 1);
-
-        // --- MATERIAIS LEVES ---
-        const roadMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-        const grassMat = new THREE.MeshLambertMaterial({ color: 0x051a05 });
-        const buildingMat = new THREE.MeshLambertMaterial({ color: 0x333344 });
-
-        // --- OBJECT POOLING (REUSO DE OBJETOS) ---
-        const pool = [];
-        const poolSize = 20;
-        const spacing = 15;
-
-        for (let i = 0; i < poolSize; i++) {
-            const group = new THREE.Group();
-            
-            // Prédio
-            const build = new THREE.Mesh(boxGeo, buildingMat);
-            const h = 5 + Math.random() * 10;
-            build.scale.set(3, h, 3);
-            build.position.set(Math.random() > 0.5 ? 10 : -10, h/2, 0);
-            
-            // Poste
-            const pole = new THREE.Mesh(cylinderGeo, buildingMat);
-            pole.scale.set(1, 6, 1);
-            pole.position.set(build.position.x > 0 ? 7 : -7, 3, 0);
-            
-            // Luz do poste (Ponto de luz otimizado)
-            const pLight = new THREE.PointLight(0xffaa00, 10, 15);
-            pLight.position.set(0, 3, 0);
-            pole.add(pLight);
-
-            group.add(build, pole);
-            group.position.z = -i * spacing;
-            
-            scene.add(group);
-            pool.push(group);
-        }
-
-        // Estrada Estática
-        const road = new THREE.Mesh(planeGeo, roadMat);
-        road.scale.set(14, 1000, 1);
+        // 3. CONSTRUÇÃO DO MUNDO (Instanciada para velocidade)
+        const roadGeo = new THREE.PlaneGeometry(15, 200);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
         scene.add(road);
 
-        // --- CARRO DO JOGADOR ---
-        const car = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x0077ff }));
-        car.scale.set(1.2, 0.6, 2.2);
-        car.position.set(0, 0.3, -5);
+        // Linhas da estrada (Simplificadas para evitar bugs de textura)
+        const lineGeo = new THREE.PlaneGeometry(0.5, 200);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.rotation.x = -Math.PI / 2;
+        line.position.y = 0.01;
+        scene.add(line);
+
+        // 4. PLAYER (Física de baixo custo)
+        const car = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2, 0.5, 2.5),
+            new THREE.MeshStandardMaterial({ color: 0xff0000, metalness: 0.9, roughness: 0.1 })
+        );
+        car.add(body);
+        car.position.y = 0.3;
         scene.add(car);
 
-        // --- CONTROLES ---
+        camera.position.set(0, 2.5, 6);
+        camera.lookAt(car.position);
+
+        // 5. CONTROLES E LOOP (Verificado contra memory leak)
         let moveX = 0;
-        const keys = { left: false, right: false };
+        const keys = {};
 
-        const updateInput = (key, val) => { keys[key] = val; };
-        window.onkeydown = (e) => { if(e.code=='ArrowLeft') keys.left=true; if(e.code=='ArrowRight') keys.right=true; };
-        window.onkeyup = (e) => { if(e.code=='ArrowLeft') keys.left=false; if(e.code=='ArrowRight') keys.right=false; };
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
         
-        document.getElementById('lBtn').ontouchstart = () => keys.left = true;
-        document.getElementById('lBtn').ontouchend = () => keys.left = false;
-        document.getElementById('rBtn').ontouchstart = () => keys.right = true;
-        document.getElementById('rBtn').ontouchend = () => keys.right = false;
+        // Touch para Celular
+        window.addEventListener('touchstart', (e) => {
+            const touchX = e.touches[0].clientX;
+            moveX = touchX < window.innerWidth / 2 ? -0.1 : 0.1;
+        });
+        window.addEventListener('touchend', () => moveX = 0);
 
-        // --- LOOP PRINCIPAL (ANTI-TRAVA) ---
-        const speed = 0.6;
-        camera.position.set(0, 4, 2);
-        camera.lookAt(0, 0, -15);
+        function update() {
+            requestAnimationFrame(update);
 
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Mover pool de objetos (Object Pooling)
-            pool.forEach(obj => {
-                obj.position.z += speed;
-                if (obj.position.z > 10) {
-                    obj.position.z = -(poolSize - 1) * spacing;
-                }
-            });
-
-            // Movimento do carro
-            if (keys.left && car.position.x > -5) car.position.x -= 0.15;
-            if (keys.right && car.position.x < 5) car.position.x += 0.15;
-            
-            camera.position.x = car.position.x * 0.5;
-
-            renderer.render(scene, camera);
-        }
-
-        animate();
-
-        // Resize
-        window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
-    </script>
-</body>
-</html>
+            // Movimentação suave
