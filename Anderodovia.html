@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Midnight Drive 3D</title>
+    <title>Day Drive 3D - Lento</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
             margin: 0; 
-            background: #000; 
+            background: #87CEEB; /* Cor do céu */
             overflow: hidden; 
             font-family: 'Segoe UI', sans-serif; 
             touch-action: none; 
@@ -16,34 +16,28 @@
         
         canvas { display: block; width: 100vw; height: 100vh; }
 
-        /* HUD - Pontuação */
         #hud {
             position: absolute; top: 20px; left: 0; width: 100%;
-            text-align: center; color: #fff; font-size: 1.5rem;
-            letter-spacing: 2px; text-shadow: 2px 2px 4px #000;
-            z-index: 10; pointer-events: none;
+            text-align: center; color: #333; font-size: 1.5rem;
+            font-weight: bold; letter-spacing: 2px; z-index: 10; pointer-events: none;
         }
 
-        /* Telas de Menu e Game Over */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; color: white;
+            background: rgba(255, 255, 255, 0.85); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: #333;
             z-index: 30; text-align: center; padding: 20px;
         }
 
-        h1 { font-size: 3rem; margin: 0; color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
-        p { font-size: 1.2rem; color: #aaa; margin: 10px 0 30px; }
+        h1 { font-size: 3rem; margin: 0; color: #ff8c00; text-shadow: 2px 2px 0px #fff; }
 
         button.btn-play {
-            padding: 15px 50px; font-size: 1.5rem; background: #00d4ff;
-            border: none; color: #000; font-weight: bold; border-radius: 50px;
-            cursor: pointer; box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+            padding: 15px 50px; font-size: 1.5rem; background: #4CAF50;
+            border: none; color: white; font-weight: bold; border-radius: 50px;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             transition: 0.3s;
         }
-        button:hover { transform: scale(1.1); }
 
-        /* Controles para Celular */
         #mobile-controls {
             position: absolute; bottom: 40px; width: 100%;
             display: flex; justify-content: space-around;
@@ -51,12 +45,12 @@
         }
 
         .control-btn {
-            width: 80px; height: 80px; background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            width: 80px; height: 80px; background: rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(0, 0, 0, 0.2); border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 40px; color: white; user-select: none;
+            font-size: 40px; color: #333; user-select: none;
         }
-        .control-btn:active { background: rgba(255, 255, 255, 0.3); }
+        .control-btn:active { background: rgba(0, 0, 0, 0.3); }
 
         #game-over { display: none; }
     </style>
@@ -66,15 +60,15 @@
 <div id="hud">DISTÂNCIA: 0m</div>
 
 <div id="menu" class="overlay">
-    <h1>MIDNIGHT DRIVE</h1>
-    <p>Desvie do trânsito na estrada noturna</p>
-    <button class="btn-play" onclick="startGame()">JOGAR</button>
+    <h1>SUMMER DRIVE</h1>
+    <p>Passeio relaxante no modo dia</p>
+    <button class="btn-play" onclick="startGame()">INICIAR</button>
 </div>
 
 <div id="game-over" class="overlay">
-    <h1 style="color: #ff4d4d; text-shadow: 0 0 10px #ff4d4d;">BATEU!</h1>
+    <h1 style="color: #ff4d4d;">BATEU!</h1>
     <p id="final-score">Pontos: 0</p>
-    <button class="btn-play" onclick="startGame()">TENTAR DE NOVO</button>
+    <button class="btn-play" onclick="startGame()">RECOMEÇAR</button>
 </div>
 
 <div id="mobile-controls">
@@ -91,42 +85,30 @@ const hud = document.getElementById('hud');
 const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
 
-// Configurações Técnicas
 let width, height, horizon;
 let playerX = 0; 
 let roadOffset = 0;
 let score = 0;
 let isRunning = false;
-let objects = []; // Armazena prédios, postes e carros
+let objects = [];
 
-// --- VELOCIDADE SOLICITADA: 1 (Muito Lento) ---
-const GAME_SPEED = 1; 
-const PLAYER_STRENGTH = 0.03; // Sensibilidade do movimento
+const GAME_SPEED = 1; // Velocidade 1
+const PLAYER_STRENGTH = 0.03;
 
 function resize() {
     width = window.innerWidth;
     height = window.innerHeight;
     canvas.width = width;
     canvas.height = height;
-    horizon = height * 0.45; // Linha do horizonte
+    horizon = height * 0.45;
 }
 window.addEventListener('resize', resize);
 resize();
 
-// Lógica de Controles
 const input = { left: false, right: false };
-document.addEventListener('keydown', (e) => {
-    if(e.key === "ArrowLeft") input.left = true;
-    if(e.key === "ArrowRight") input.right = true;
-});
-document.addEventListener('keyup', (e) => {
-    if(e.key === "ArrowLeft") input.left = false;
-    if(e.key === "ArrowRight") input.right = false;
-});
-
-// Toque Mobile
 const btnL = document.getElementById('btnLeft');
 const btnR = document.getElementById('btnRight');
+
 const handleTouch = (btn, state) => {
     btn.addEventListener('touchstart', (e) => { e.preventDefault(); input[state] = true; });
     btn.addEventListener('touchend', () => input[state] = false);
@@ -136,50 +118,36 @@ const handleTouch = (btn, state) => {
 handleTouch(btnL, 'left');
 handleTouch(btnR, 'right');
 
+document.addEventListener('keydown', (e) => {
+    if(e.key === "ArrowLeft") input.left = true;
+    if(e.key === "ArrowRight") input.right = true;
+});
+document.addEventListener('keyup', (e) => {
+    if(e.key === "ArrowLeft") input.left = false;
+    if(e.key === "ArrowRight") input.right = false;
+});
+
 function startGame() {
-    score = 0;
-    playerX = 0;
-    roadOffset = 0;
-    objects = [];
+    score = 0; playerX = 0; roadOffset = 0; objects = [];
     isRunning = true;
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
-    
-    // Gerar cenário inicial
-    for(let i = 0; i < 40; i++) {
-        createScenery(i * 30);
-    }
-    
+    for(let i = 0; i < 40; i++) createScenery(i * 30);
     animate();
 }
 
 function createScenery(z) {
-    // Prédios fora da rua (x > 1.5 ou x < -1.5)
     const side = Math.random() > 0.5 ? (1.5 + Math.random() * 2) : (-1.5 - Math.random() * 2);
-    const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
+    const colors = ['#e67e22', '#e74c3c', '#3498db', '#9b59b6', '#f1c40f'];
     objects.push({
         z, x: side, 
-        type: Math.random() > 0.3 ? 'building' : 'lamp',
+        type: Math.random() > 0.2 ? 'building' : 'tree',
         color: colors[Math.floor(Math.random()*colors.length)]
     });
 }
 
-function createTraffic() {
-    // Carros apenas dentro da rua (x entre -0.8 e 0.8)
-    if(Math.random() < 0.01) {
-        objects.push({
-            z: 1000, 
-            x: (Math.random() * 1.6) - 0.8, 
-            type: 'npc',
-            color: Math.random() > 0.5 ? '#cc3333' : '#ccaa00' // Vermelho ou Amarelo
-        });
-    }
-}
-
 function animate() {
     if(!isRunning) return;
-
-    // Lógica
     roadOffset += GAME_SPEED;
     score += 0.1;
     hud.innerText = `DISTÂNCIA: ${Math.floor(score)}m`;
@@ -188,22 +156,31 @@ function animate() {
     if(input.right) playerX += PLAYER_STRENGTH;
     playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    createTraffic();
+    if(Math.random() < 0.008) {
+        objects.push({ z: 1000, x: (Math.random() * 1.6) - 0.8, type: 'npc', color: '#e74c3c' });
+    }
+
     draw();
     requestAnimationFrame(animate);
 }
 
 function draw() {
-    // 1. Céu
-    ctx.fillStyle = "#000";
+    // 1. Céu Dia
+    ctx.fillStyle = "#87CEEB";
     ctx.fillRect(0, 0, width, horizon);
 
-    // 2. Grama lateral
-    ctx.fillStyle = "#0a1400";
+    // Sol
+    ctx.fillStyle = "#FFD700";
+    ctx.beginPath();
+    ctx.arc(width * 0.8, horizon * 0.4, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Grama Dia
+    ctx.fillStyle = "#4CAF50";
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // 3. Estrada (Trapezóide 3D)
-    ctx.fillStyle = "#1a1a1a";
+    // 3. Estrada Dia (Cinza claro)
+    ctx.fillStyle = "#666";
     ctx.beginPath();
     ctx.moveTo(width/2 - 20, horizon);
     ctx.lineTo(width/2 + 20, horizon);
@@ -211,8 +188,8 @@ function draw() {
     ctx.lineTo(width * -0.5, height);
     ctx.fill();
 
-    // Faixa central tracejada
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    // Faixa central (Amarela para modo dia)
+    ctx.strokeStyle = "#FFD700";
     ctx.setLineDash([20, 40]);
     ctx.lineDashOffset = -roadOffset * 2;
     ctx.beginPath();
@@ -221,8 +198,7 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 4. Renderizar Objetos (Prédios e Carros)
-    // Ordenar por Z para desenhar o que está longe primeiro
+    // 4. Objetos
     objects.sort((a, b) => b.z - a.z);
 
     for(let i = objects.length - 1; i >= 0; i--) {
@@ -230,12 +206,8 @@ function draw() {
         obj.z -= GAME_SPEED;
 
         if(obj.z < 1) {
-            if(obj.type === 'npc') {
-                objects.splice(i, 1); // Remove carro que passou
-                continue;
-            } else {
-                obj.z = 1000; // Recicla prédio
-            }
+            if(obj.type === 'npc') { objects.splice(i, 1); continue; }
+            else { obj.z = 1000; }
         }
 
         const scale = 30 / obj.z;
@@ -246,49 +218,44 @@ function draw() {
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-            // Janelas foscas
-            ctx.fillStyle = "rgba(255,255,100,0.1)";
+            ctx.fillStyle = "#333"; // Janelas escuras (dia)
             ctx.fillRect(xPos - size/2, yPos - size*3, size/3, size/3);
         } 
-        else if(obj.type === 'lamp') {
-            ctx.fillStyle = "#333";
-            ctx.fillRect(xPos - 2, yPos - size*3, 4, size*3);
-            ctx.fillStyle = "rgba(255,250,150,0.4)";
-            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*15, 0, Math.PI*2); ctx.fill();
+        else if(obj.type === 'tree') {
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(xPos - 5 * scale, yPos - 40 * scale, 10 * scale, 40 * scale);
+            ctx.fillStyle = "#2E7D32";
+            ctx.beginPath();
+            ctx.arc(xPos, yPos - 50 * scale, 25 * scale, 0, Math.PI * 2);
+            ctx.fill();
         }
         else if(obj.type === 'npc') {
-            // Desenhar Carro NPC (Ônibus/Carro)
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size/2, yPos - size/3, size, size/3);
-            // Colisão
-            if(obj.z < 40 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.3) {
-                endGame();
-            }
+            if(obj.z < 40 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.3) endGame();
         }
     }
 
-    // 5. Carro do Jogador (Azul) - Fixo na tela
+    // 5. Carro Jogador
     const pSize = width > 600 ? 120 : 80;
     const px = width / 2;
     const py = height - 120;
     
-    // Sombra
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
-    ctx.fillRect(px - pSize/2, py + pSize/4, pSize, 20);
-    // Corpo
-    ctx.fillStyle = "#0077be"; // Azul da imagem
+    // Sombra do carro
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(px - pSize/2, py + pSize/3, pSize, 15);
+
+    ctx.fillStyle = "#2196F3"; // Azul vibrante
     ctx.fillRect(px - pSize/2, py, pSize, pSize/2.5);
-    // Vidro traseiro
-    ctx.fillStyle = "#111";
+    ctx.fillStyle = "#add8e6"; // Vidro refletindo céu
     ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, pSize/10);
 }
 
 function endGame() {
     isRunning = false;
     gameOverScreen.style.display = 'flex';
-    document.getElementById('final-score').innerText = `Distância percorrida: ${Math.floor(score)}m`;
+    document.getElementById('final-score').innerText = `Distância: ${Math.floor(score)}m`;
 }
 </script>
-
 </body>
 </html>
