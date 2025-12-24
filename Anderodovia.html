@@ -1,123 +1,29 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<title>Perigo nas Bordas</title>
-<style>
-html,body{
-    margin:0;
-    padding:0;
-    overflow:hidden;
-    font-family: Arial, Helvetica, sans-serif;
-    background:#6ec6ff;
-}
-
-#ui{
-    position:absolute;
-    top:10px;
-    width:100%;
-    text-align:center;
-    color:white;
-    pointer-events:none;
-}
-
-#ui .top{
-    display:flex;
-    justify-content:space-between;
-    padding:0 20px;
-    font-size:16px;
-}
-
-#alerta{
-    margin-top:20px;
-}
-
-#alerta h1{
-    margin:10px 0;
-}
-
-#btnStart{
-    margin-top:15px;
-    padding:12px 30px;
-    background:#7cb342;
-    border-radius:6px;
-    display:inline-block;
-    font-weight:bold;
-    cursor:pointer;
-    pointer-events:auto;
-}
-
-canvas{
-    display:block;
-}
-</style>
-</head>
-<body>
-
-<div id="ui">
-    <div class="top">
-        <div>KM: <span id="km">0</span><br>DISTÂNCIA</div>
-        <div>Horizon <span id="nivel">1</span></div>
-        <div id="colidiu" style="color:red;display:none;">COLIDIU!</div>
-    </div>
-
-    <div id="alerta">
-        <h1>PERIGO NAS BORDAS!</h1>
-        <p>Carros vermelhos surgem nas laterais.</p>
-        <div id="btnStart">INICIAR</div>
-    </div>
-</div>
-
-<canvas id="game"></canvas>
-
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-let jogar = false;
-let velocidade = 2;
-let km = 0;
-
-const carroPlayer = {
-    x: canvas.width/2,
-    y: canvas.height*0.75,
-    w: 40,
-    h: 70
-};
-
-let inimigos = [];
-
 function criarInimigo(){
-    const faixa = Math.floor(Math.random()*3);
-    const posX = canvas.width/2 + (faixa-1)*80;
+    const tipo = Math.random() < 0.4 ? "red" : "yellow";
+
+    let posX;
+    let velExtra = 0;
+
+    if(tipo === "red"){
+        // Vermelhos nas bordas
+        posX = Math.random() < 0.5 
+            ? canvas.width/2 - 130 
+            : canvas.width/2 + 130;
+        velExtra = 2;
+    }else{
+        // Amarelos no centro
+        const faixa = Math.floor(Math.random()*3);
+        posX = canvas.width/2 + (faixa-1)*80;
+    }
+
     inimigos.push({
         x: posX,
         y: -100,
         w:40,
         h:70,
-        cor: ["red","yellow","blue"][Math.floor(Math.random()*3)]
+        cor: tipo,
+        velocidade: velExtra
     });
 }
-
-function desenharEstrada(){
-    ctx.fillStyle="#4caf50";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    ctx.fillStyle="#333";
-    ctx.fillRect(canvas.width/2-160,0,320,canvas.height);
-
-    ctx.strokeStyle="yellow";
-    ctx.lineWidth=4;
-    ctx.setLineDash([20,20]);
-    ctx.beginPath();
-    ctx.moveTo(canvas.width/2,0);
-    ctx.lineTo(canvas.width/2,canvas.height);
-    ctx.stroke();
-    ctx.setLineDash([]);
-}
-
-function desenharCarro(c){
-    ctx.fillStyle=c.cor || "blue";
+</script>
