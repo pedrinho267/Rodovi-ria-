@@ -1,29 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Perigo nas Bordas</title>
+<style>
+html,body{
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    font-family: Arial, Helvetica, sans-serif;
+    background:#6ec6ff;
+}
+
+#ui{
+    position:absolute;
+    top:10px;
+    width:100%;
+    text-align:center;
+    color:white;
+    pointer-events:none;
+}
+
+#ui .top{
+    display:flex;
+    justify-content:space-between;
+    padding:0 20px;
+    font-size:16px;
+}
+
+#alerta{
+    margin-top:20px;
+}
+
+#btnStart{
+    margin-top:15px;
+    padding:12px 30px;
+    background:#7cb342;
+    border-radius:6px;
+    display:inline-block;
+    font-weight:bold;
+    cursor:pointer;
+    pointer-events:auto;
+}
+
+canvas{
+    display:block;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+    <div class="top">
+        <div>KM: <span id="km">0</span><br>DISTÂNCIA</div>
+        <div>Horizon <span id="nivel">1</span></div>
+        <div id="colidiu" style="color:red;display:none;">COLIDIU!</div>
+    </div>
+
+    <div id="alerta">
+        <h1>PERIGO NAS BORDAS!</h1>
+        <p>Carros vermelhos surgem nas laterais.</p>
+        <div id="btnStart">INICIAR</div>
+    </div>
+</div>
+
+<canvas id="game"></canvas>
+
 <script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let jogar = false;
+let velocidade = 2;
+let km = 0;
+
+const carroPlayer = {
+    x: canvas.width/2,
+    y: canvas.height*0.75,
+    w: 40,
+    h: 70
+};
+
+let inimigos = [];
+
+// ================= RUA =================
+function desenharEstrada(){
+    // Grama
+    ctx.fillStyle = "#5cb85c";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Estrada (perspectiva)
+    const centro = canvas.width/2;
+    const base = 360;
+    const topo = 80;
+
+    ctx.fillStyle = "#2e2e2e";
+    ctx.beginPath();
+    ctx.moveTo(centro - topo, 0);
+    ctx.lineTo(centro + topo, 0);
+    ctx.lineTo(centro + base, canvas.height);
+    ctx.lineTo(centro - base, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bordas brancas
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(centro - topo, 0);
+    ctx.lineTo(centro - base, canvas.height);
+    ctx.moveTo(centro + topo, 0);
+    ctx.lineTo(centro + base, canvas.height);
+    ctx.stroke();
+
+    // Faixa amarela central
+    ctx.strokeStyle = "yellow";
+    ctx.lineWidth = 4;
+    ctx.setLineDash([30,25]);
+    ctx.lineDashOffset = -km * 50;
+    ctx.beginPath();
+    ctx.moveTo(centro,0);
+    ctx.lineTo(centro,canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+// ================= CARROS =================
+function desenharCarro(c){
+    ctx.fillStyle = c.cor;
+    ctx.fillRect(c.x - c.w/2, c.y, c.w, c.h);
+}
+
 function criarInimigo(){
     const tipo = Math.random() < 0.4 ? "red" : "yellow";
-
     let posX;
     let velExtra = 0;
 
     if(tipo === "red"){
-        // Vermelhos nas bordas
+        // Bordas
         posX = Math.random() < 0.5 
-            ? canvas.width/2 - 130 
-            : canvas.width/2 + 130;
+            ? canvas.width/2 - 150 
+            : canvas.width/2 + 150;
         velExtra = 2;
     }else{
-        // Amarelos no centro
-        const faixa = Math.floor(Math.random()*3);
-        posX = canvas.width/2 + (faixa-1)*80;
+        // Centro
+        const faixas = [-90, 0, 90];
+        posX = canvas.width/2 + faixas[Math.floor(Math.random()*3)];
     }
 
     inimigos.push({
         x: posX,
         y: -100,
-        w:40,
-        h:70,
+        w: 40,
+        h: 70,
         cor: tipo,
         velocidade: velExtra
     });
 }
+
+function colisao(a,b){
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+// ================= LOOP =================
+function loop(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    desenharEstrada();
+
+    if(jogar){
+        km += 0.02;
+        velocidade += 0.0006;
+        document.getElementById("km").innerText = km.toFixed(1);
+
+        if(Math.random() < 0.025){
+            criarInimigo();
+        }
+
+        inimigos.forEach(i=>{
+            i.y += (velocidade*3) + i.velocidade;
+            desenharCarro(i);
+
+            if(colisao(
+                {x:carroPlayer.x-carroPlayer.w/2,y:carroPlayer.y,w:carroPlayer.w,h:carroPlayer.h},
+                {x:i.x-i.w/2,y:i.y,w:i.w,h:i.h}
+            )){
+                jogar = false;
+                document.getElementById("colidiu").style.display="block";
+                document.getElementById("alerta").style.display="block";
+            }
+        });
+
+        inimigos = inimigos.filter(i=>i.y < canvas.height+100);
+    }
+
+    desenharCarro({x:carroPlayer.x,y:carroPlayer.y,w:carroPlayer.w,h:carroPlayer.h,cor:"blue"});
+    requestAnimationFrame(loop);
+}
+
+// ================= CONTROLES =================
+window.addEventListener("mousemove",e=>{
+    carroPlayer.x = e.clientX;
+});
+
+document.getElementById("btnStart").onclick = ()=>{
+    inimigos = [];
+    km = 0;
+    velocidade = 2;
+    jogar = true;
+    document.getElementById("alerta").style.display="none";
+    document.getElementById("colidiu").style.display="none";
+};
+
+loop();
 </script>
+</body>
+</html>
