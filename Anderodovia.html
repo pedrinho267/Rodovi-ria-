@@ -1,214 +1,123 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Perigo nas Bordas - Velocity 1</title>
-    <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; background: #5db9ff; overflow: hidden; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        
-        #hud { 
-            position: absolute; top: 15px; left: 15px; color: #fff; 
-            font-size: 14px; z-index: 10; text-shadow: 2px 2px #000;
-        }
+<meta charset="UTF-8">
+<title>Perigo nas Bordas</title>
+<style>
+html,body{
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    font-family: Arial, Helvetica, sans-serif;
+    background:#6ec6ff;
+}
 
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; color: white; z-index: 30;
-        }
+#ui{
+    position:absolute;
+    top:10px;
+    width:100%;
+    text-align:center;
+    color:white;
+    pointer-events:none;
+}
 
-        #menu h1 { color: #fff; font-size: 2rem; margin-bottom: 5px; }
-        #menu p { color: #eee; margin-bottom: 20px; }
+#ui .top{
+    display:flex;
+    justify-content:space-between;
+    padding:0 20px;
+    font-size:16px;
+}
 
-        button {
-            background: #8bc34a; border: none; padding: 12px 40px;
-            font-size: 20px; color: white; border-radius: 8px; font-weight: bold;
-            cursor: pointer; box-shadow: 0 4px #689f38;
-        }
-        button:active { transform: translateY(2px); box-shadow: 0 2px #689f38; }
+#alerta{
+    margin-top:20px;
+}
 
-        /* Botões de Controle iguais à imagem */
-        #controls {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; justify-content: space-between; padding: 0 30px; z-index: 20;
-        }
-        .btn {
-            width: 75px; height: 75px; background: rgba(255,255,255,0.4);
-            border-radius: 50%; border: 4px solid #fff; display: flex;
-            justify-content: center; align-items: center; font-size: 40px;
-            color: #333; user-select: none;
-        }
-    </style>
+#alerta h1{
+    margin:10px 0;
+}
+
+#btnStart{
+    margin-top:15px;
+    padding:12px 30px;
+    background:#7cb342;
+    border-radius:6px;
+    display:inline-block;
+    font-weight:bold;
+    cursor:pointer;
+    pointer-events:auto;
+}
+
+canvas{
+    display:block;
+}
+</style>
 </head>
 <body>
 
-<div id="hud">KM: 0<br>DISTÂNCIA: 0m</div>
+<div id="ui">
+    <div class="top">
+        <div>KM: <span id="km">0</span><br>DISTÂNCIA</div>
+        <div>Horizon <span id="nivel">1</span></div>
+        <div id="colidiu" style="color:red;display:none;">COLIDIU!</div>
+    </div>
 
-<div id="menu" class="overlay">
-    <h1>PERIGO NAS BORDAS!</h1>
-    <p>Carros vermelhos surgem nas laterais.</p>
-    <button onclick="startGame()">INICIAR</button>
+    <div id="alerta">
+        <h1>PERIGO NAS BORDAS!</h1>
+        <p>Carros vermelhos surgem nas laterais.</p>
+        <div id="btnStart">INICIAR</div>
+    </div>
 </div>
 
-<div id="game-over" class="overlay" style="display:none;">
-    <h1 style="color: #ff3b3b;">COLIDIU!</h1>
-    <button onclick="startGame()">TENTAR DE NOVO</button>
-</div>
-
-<div id="controls">
-    <div class="btn" id="lBtn">←</div>
-    <div class="btn" id="rBtn">→</div>
-</div>
-
-<canvas id="gameCanvas"></canvas>
+<canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const hud = document.getElementById('hud');
-const menu = document.getElementById('menu');
-const gameOver = document.getElementById('game-over');
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-let width, height, horizon;
-let carX = 0; 
-let roadZ = 0;
-let score = 0;
-let isRunning = false;
-let obstacles = [];
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const SPEED = 1; 
-const LATERAL_SPEED = 0.025;
+let jogar = false;
+let velocidade = 2;
+let km = 0;
 
-function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-    horizon = height * 0.45;
-}
-window.onresize = resize;
-resize();
-
-// Inputs
-const input = { left: false, right: false };
-const setupBtn = (id, key) => {
-    const el = document.getElementById(id);
-    const start = (e) => { e.preventDefault(); input[key] = true; };
-    const end = () => input[key] = false;
-    el.ontouchstart = start; el.ontouchend = end;
-    el.onmousedown = start; el.onmouseup = end;
+const carroPlayer = {
+    x: canvas.width/2,
+    y: canvas.height*0.75,
+    w: 40,
+    h: 70
 };
-setupBtn('lBtn', 'left'); setupBtn('rBtn', 'right');
 
-function startGame() {
-    score = 0; carX = 0; roadZ = 0; obstacles = [];
-    isRunning = true;
-    menu.style.display = 'none';
-    gameOver.style.display = 'none';
-    animate();
+let inimigos = [];
+
+function criarInimigo(){
+    const faixa = Math.floor(Math.random()*3);
+    const posX = canvas.width/2 + (faixa-1)*80;
+    inimigos.push({
+        x: posX,
+        y: -100,
+        w:40,
+        h:70,
+        cor: ["red","yellow","blue"][Math.floor(Math.random()*3)]
+    });
 }
 
-function spawnObstacle() {
-    if (Math.random() < 0.015) {
-        let type = Math.random() > 0.5 ? 'red' : 'yellow';
-        let posX;
-        
-        if (type === 'red') {
-            // Carros vermelhos: Spawnam nos cantos (esquerda -0.8 ou direita 0.8)
-            posX = Math.random() > 0.5 ? -0.85 : 0.85;
-        } else {
-            // Carros amarelos: Spawnam mais pro meio
-            posX = (Math.random() * 0.6) - 0.3;
-        }
+function desenharEstrada(){
+    ctx.fillStyle="#4caf50";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-        obstacles.push({ z: 1000, x: posX, color: type === 'red' ? '#ff3b3b' : '#ffeb3b' });
-    }
-}
+    ctx.fillStyle="#333";
+    ctx.fillRect(canvas.width/2-160,0,320,canvas.height);
 
-function animate() {
-    if (!isRunning) return;
-    
-    roadZ += SPEED;
-    score += 0.1;
-    hud.innerHTML = `KM: ${Math.floor(score/10)}<br>DISTÂNCIA: ${Math.floor(score)}m`;
-
-    if (input.left) carX -= LATERAL_SPEED;
-    if (input.right) carX += LATERAL_SPEED;
-    carX = Math.max(-0.9, Math.min(0.9, carX));
-
-    spawnObstacle();
-    draw();
-    requestAnimationFrame(animate);
-}
-
-function draw() {
-    // Céu
-    ctx.fillStyle = "#5db9ff"; ctx.fillRect(0,0,width,horizon);
-    // Grama
-    ctx.fillStyle = "#69b522"; ctx.fillRect(0,horizon,width,height-horizon);
-
-    // Estrada
-    ctx.fillStyle = "#333";
+    ctx.strokeStyle="yellow";
+    ctx.lineWidth=4;
+    ctx.setLineDash([20,20]);
     ctx.beginPath();
-    ctx.moveTo(width/2 - 20, horizon); ctx.lineTo(width/2 + 20, horizon);
-    ctx.lineTo(width * 1.5, height); ctx.lineTo(width * -0.5, height);
-    ctx.fill();
-
-    // Faixas brancas laterais
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(width/2 - 25, horizon); ctx.lineTo(width * -0.2, height);
-    ctx.moveTo(width/2 + 25, horizon); ctx.lineTo(width * 1.2, height);
+    ctx.moveTo(canvas.width/2,0);
+    ctx.lineTo(canvas.width/2,canvas.height);
     ctx.stroke();
-
-    // Faixa central amarela
-    ctx.strokeStyle = "#ffeb3b"; ctx.setLineDash([30, 60]);
-    ctx.lineDashOffset = -roadZ * 2.5;
-    ctx.beginPath(); ctx.moveTo(width/2, horizon); ctx.lineTo(width/2, height); ctx.stroke();
     ctx.setLineDash([]);
-
-    // Obstáculos
-    obstacles.sort((a,b) => b.z - a.z);
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-        let o = obstacles[i];
-        o.z -= SPEED;
-        if (o.z < 1) { obstacles.splice(i, 1); continue; }
-
-        let scale = 30 / o.z;
-        let x = width/2 + o.x * scale * (width * 0.6);
-        let y = horizon + scale * (height * 0.6);
-        let size = scale * 130;
-
-        ctx.fillStyle = o.color;
-        ctx.fillRect(x - size/2, y - size/3, size, size/2.5);
-        
-        // Detalhes (Janelas)
-        ctx.fillStyle = "rgba(255,255,255,0.3)";
-        ctx.fillRect(x - size/2 + 5, y - size/3 + 5, size - 10, size/10);
-
-        // Colisão (O carro do jogador está fixo no PX)
-        if (o.z < 50 && o.z > 10) {
-            let pX = (width/2) + (carX * (width * 0.5));
-            if (Math.abs(x - pX) < size * 0.8) {
-                isRunning = false;
-                gameOver.style.display = 'flex';
-            }
-        }
-    }
-
-    // Carro Azul (Jogador)
-    let pSize = width > 500 ? 100 : 70;
-    let px = (width/2) + (carX * (width * 0.5));
-    let py = height - 100;
-
-    ctx.fillStyle = "#2196f3";
-    ctx.fillRect(px - pSize/2, py, pSize, pSize/2.5);
-    ctx.fillStyle = "#0d47a1"; // Vidro
-    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, pSize/10);
 }
-</script>
-</body>
-</html>
+
+function desenharCarro(c){
+    ctx.fillStyle=c.cor || "blue";
