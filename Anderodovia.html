@@ -2,53 +2,72 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Midnight Drive - Velocidade 1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>Slow Drive Mobile</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        canvas { display: block; margin: 0 auto; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: manipulation; }
+        canvas { display: block; width: 100vw; height: 100vh; }
         
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            pointer-events: none;
-        }
-
-        .overlay {
-            background: rgba(0,0,0,0.9); color: white; padding: 40px;
-            text-align: center; border-radius: 15px; border: 1px solid #444;
-            pointer-events: auto;
-        }
-
-        button {
-            background: #222; border: 1px solid #555; padding: 10px 30px;
-            font-size: 18px; color: #fff; cursor: pointer; border-radius: 5px;
-            margin-top: 20px; transition: 0.3s;
-        }
-
-        button:hover { background: #444; }
-
         #hud {
-            position: absolute; top: 20px; left: 20px; color: #aaa;
-            font-size: 20px; letter-spacing: 3px; z-index: 100;
+            position: absolute; top: 15px; left: 15px; color: #fff;
+            font-size: 18px; letter-spacing: 1px; z-index: 10;
+            text-shadow: 1px 1px 2px #000;
         }
+
+        /* Camadas de Menu e Game Over */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: white; text-align: center;
+            z-index: 20; padding: 20px;
+        }
+
+        button.main-btn {
+            background: #008cba; border: none; padding: 15px 40px;
+            font-size: 20px; color: white; border-radius: 50px;
+            margin-top: 20px; font-weight: bold; cursor: pointer;
+        }
+
+        /* Controles Mobile */
+        #mobile-controls {
+            position: absolute; bottom: 30px; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 30px;
+            z-index: 15; pointer-events: none;
+        }
+
+        .control-btn {
+            width: 80px; height: 80px; background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; font-size: 40px; color: white;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            pointer-events: auto; user-select: none;
+        }
+
+        .control-btn:active { background: rgba(255, 255, 255, 0.4); }
+
+        #game-over { display: none; }
     </style>
 </head>
 <body>
 
-<div id="hud">VELOCIDADE: 1</div>
+<div id="hud">KM: 0</div>
 
-<div id="ui-layer">
-    <div id="menu" class="overlay">
-        <h1>MODO LENTO</h1>
-        <p>Aproveite a paisagem. Use as setas para mover.</p>
-        <button onclick="startGame()">INICIAR</button>
-    </div>
+<div id="menu" class="overlay">
+    <h1 style="color: #00d4ff;">SLOW DRIVE</h1>
+    <p>Use as setas na tela ou teclado</p>
+    <button class="main-btn" onclick="startGame()">INICIAR PASSEIO</button>
+</div>
 
-    <div id="game-over" class="overlay" style="display:none;">
-        <h1 style="color: #ff4d4d;">FIM</h1>
-        <button onclick="startGame()">VOLTAR</button>
-    </div>
+<div id="game-over" class="overlay">
+    <h1 style="color: #ff4d4d;">COLISÃO!</h1>
+    <p id="final-score">Distância: 0 KM</p>
+    <button class="main-btn" onclick="startGame()">RECOMEÇAR</button>
+</div>
+
+<div id="mobile-controls">
+    <div class="control-btn" id="btnLeft">←</div>
+    <div class="control-btn" id="btnRight">→</div>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -56,20 +75,51 @@
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const scoreLabel = document.getElementById('hud');
 const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
-const hud = document.getElementById('hud');
 
 let width, height, horizon;
 let playerX = 0; 
 let roadOffset = 0;
+let score = 0;
 let isRunning = false;
 let obstacles = [];
 let scenery = [];
 
-// --- VELOCIDADE SOLICITADA: 1 ---
+// --- VELOCIDADE FIXA: 1 ---
 const GAME_SPEED = 1; 
-const PLAYER_SENSITIVITY = 0.015; 
+const PLAYER_SENSITIVITY = 0.02; 
+
+// Controle de inputs
+const keys = { Left: false, Right: false };
+
+function setupInputs() {
+    // Teclado
+    window.onkeydown = (e) => {
+        if(e.code === 'ArrowLeft') keys.Left = true;
+        if(e.code === 'ArrowRight') keys.Right = true;
+    };
+    window.onkeyup = (e) => {
+        if(e.code === 'ArrowLeft') keys.Left = false;
+        if(e.code === 'ArrowRight') keys.Right = false;
+    };
+
+    // Toque Mobile
+    const btnL = document.getElementById('btnLeft');
+    const btnR = document.getElementById('btnRight');
+
+    btnL.ontouchstart = (e) => { e.preventDefault(); keys.Left = true; };
+    btnL.ontouchend = () => keys.Left = false;
+    btnR.ontouchstart = (e) => { e.preventDefault(); keys.Right = true; };
+    btnR.ontouchend = () => keys.Right = false;
+    
+    // Suporte para clique de mouse (teste no PC)
+    btnL.onmousedown = () => keys.Left = true;
+    btnL.onmouseup = () => keys.Left = false;
+    btnR.onmousedown = () => keys.Right = true;
+    btnR.onmouseup = () => keys.Right = false;
+}
 
 function resize() {
     width = window.innerWidth;
@@ -81,8 +131,10 @@ function resize() {
 
 window.addEventListener('resize', resize);
 resize();
+setupInputs();
 
 function startGame() {
+    score = 0;
     playerX = 0;
     roadOffset = 0;
     obstacles = [];
@@ -91,17 +143,13 @@ function startGame() {
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
     
-    // Criar o mundo inicial
-    for(let i = 0; i < 30; i++) {
-        addScenery(i * 40);
-    }
-    
+    // Gerar cenário inicial
+    for(let i = 0; i < 25; i++) { addScenery(i * 60); }
     animate();
 }
 
 function addScenery(z) {
-    // Prédios fora da estrada (x > 1.4 ou x < -1.4)
-    const side = Math.random() > 0.5 ? (1.5 + Math.random()) : (-1.5 - Math.random());
+    const side = Math.random() > 0.5 ? (1.6 + Math.random()) : (-1.6 - Math.random());
     const colors = ['#5b4636', '#a52a2a', '#2d4a3e', '#3b3b5b'];
     scenery.push({
         z: z,
@@ -111,25 +159,24 @@ function addScenery(z) {
     });
 }
 
-const keys = {};
-window.onkeydown = (e) => keys[e.code] = true;
-window.onkeyup = (e) => keys[e.code] = false;
-
 function animate() {
     if(!isRunning) return;
 
     roadOffset += GAME_SPEED;
+    score += 0.2;
+    scoreLabel.innerText = `KM: ${Math.floor(score/10)}`;
 
-    if(keys['ArrowLeft']) playerX -= PLAYER_SENSITIVITY;
-    if(keys['ArrowRight']) playerX += PLAYER_SENSITIVITY;
+    // Movimentação
+    if(keys.Left) playerX -= PLAYER_SENSITIVITY;
+    if(keys.Right) playerX += PLAYER_SENSITIVITY;
     playerX = Math.max(-1.1, Math.min(1.1, playerX));
 
-    // Adicionar tráfego raramente na pista
-    if(Math.random() < 0.005) {
+    // Gerar tráfego raramente (Velocidade 1 é muito lenta)
+    if(Math.random() < 0.004) {
         obstacles.push({
             z: 1000, 
             x: (Math.random() * 1.4) - 0.7, 
-            type: Math.random() > 0.2 ? 'car' : 'bus'
+            type: Math.random() > 0.3 ? 'car' : 'bus'
         });
     }
 
@@ -138,16 +185,14 @@ function animate() {
 }
 
 function render() {
-    // Fundo Negro
+    // 1. Céu e Grama
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, horizon);
-    
-    // Grama Verde Escura
-    ctx.fillStyle = "#0a1400";
+    ctx.fillStyle = "#0d1a00"; 
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Estrada (Cinza)
-    ctx.fillStyle = "#111";
+    // 2. Estrada
+    ctx.fillStyle = "#1a1a1a";
     ctx.beginPath();
     ctx.moveTo(width/2 - 20, horizon);
     ctx.lineTo(width/2 + 20, horizon);
@@ -155,9 +200,9 @@ function render() {
     ctx.lineTo(width * -0.3, height);
     ctx.fill();
 
-    // Faixa Central Tracejada
+    // Faixa Central
     ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.setLineDash([10, 50]);
+    ctx.setLineDash([15, 60]);
     ctx.lineDashOffset = -roadOffset * 1.1;
     ctx.beginPath();
     ctx.moveTo(width/2, horizon);
@@ -165,63 +210,64 @@ function render() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Sort e Desenho dos Objetos
+    // 3. Objetos (Ordenados por profundidade)
     const allObjects = [...scenery, ...obstacles].sort((a, b) => b.z - a.z);
 
     allObjects.forEach(obj => {
         obj.z -= GAME_SPEED;
-        
         if(obj.z < 1) {
             obj.z = 1000;
+            if(obj.type === 'car' || obj.type === 'bus') obj.x = (Math.random() * 1.4) - 0.7;
             return;
         }
 
         const scale = 30 / obj.z;
-        const xPos = width/2 + (obj.x - playerX) * scale * 250;
-        const yPos = horizon + (scale * 300);
-        const size = scale * 80;
+        const xPos = width/2 + (obj.x - playerX) * scale * (width * 0.4);
+        const yPos = horizon + (scale * (height * 0.5));
+        const size = scale * 100;
 
         if(obj.type === 'building') {
             ctx.fillStyle = obj.color;
             ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-            // Janela única
+            // Janela
             ctx.fillStyle = "rgba(255, 255, 100, 0.1)";
-            ctx.fillRect(xPos - size/4, yPos - size*3, size/2, size/2);
+            ctx.fillRect(xPos - size/3, yPos - size*3, size/1.5, size/2);
         } 
         else if(obj.type === 'lamp') {
             ctx.fillStyle = "#333";
             ctx.fillRect(xPos - 1, yPos - size*3, 2, size*3);
-            ctx.fillStyle = "rgba(255, 250, 150, 0.3)";
-            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "rgba(255, 250, 150, 0.4)";
+            ctx.beginPath(); ctx.arc(xPos, yPos - size*3, scale*12, 0, Math.PI*2); ctx.fill();
         }
         else {
-            // Veículos na pista
-            ctx.fillStyle = obj.type === 'bus' ? "#732626" : "#8c6600";
+            // NPCs
+            ctx.fillStyle = obj.type === 'bus' ? "#d9534f" : "#f0ad4e";
             ctx.fillRect(xPos - size/2, yPos - size/2, size, size/2);
             
             // Colisão
-            if(obj.z < 40 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.3) {
+            if(obj.z < 50 && obj.z > 10 && Math.abs(obj.x - playerX) < 0.3) {
                 endGame();
             }
         }
     });
 
-    // Carro Azul do Jogador
-    const pSize = 80;
+    // 4. Carro do Jogador (Azul)
+    const pSize = width * 0.2;
     const px = width/2;
-    const py = height - 80;
+    const py = height - 100;
     
-    ctx.fillStyle = "#004d80"; // Azul escuro
-    ctx.fillRect(px - pSize/2, py, pSize, 30); 
-    ctx.fillStyle = "#000"; // Vidro traseiro
-    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, 8);
+    ctx.fillStyle = "#005c99";
+    ctx.fillRect(px - pSize/2, py, pSize, pSize/2.5); 
+    ctx.fillStyle = "#000"; // Vidro
+    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, pSize/8);
 }
 
 function endGame() {
     isRunning = false;
-    gameOverScreen.style.display = 'block';
+    gameOverScreen.style.display = 'flex';
+    document.getElementById('final-score').innerText = `Distância: ${Math.floor(score/10)} KM`;
 }
 </script>
 
 </body>
-    </html>
+</html>
