@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Day Drive - Carro Móvel</title>
+    <title>Summer Drive - Estrada Limpa</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; background: #87CEEB; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: none; }
@@ -18,16 +18,16 @@
 </head>
 <body>
 
-<div id="hud">DISTÂNCIA: 0m</div>
+<div id="hud">KM: 0</div>
 
 <div id="menu" class="overlay">
-    <h1>SUMMER DRIVE</h1>
-    <p>O carro se move, a estrada fica fixa</p>
+    <h1>ESTRADA LIMPA</h1>
+    <p>Sem prédios ou postes. Velocidade: 1</p>
     <button class="btn-play" onclick="startGame()">INICIAR</button>
 </div>
 
 <div id="game-over" class="overlay">
-    <h1 style="color: #ff4d4d;">BATEU!</h1>
+    <h1 style="color: #ff4d4d;">FIM DA VIAGEM</h1>
     <button class="btn-play" onclick="startGame()">RECOMEÇAR</button>
 </div>
 
@@ -46,14 +46,14 @@ const menu = document.getElementById('menu');
 const gameOverScreen = document.getElementById('game-over');
 
 let width, height, horizon;
-let carVisualX = 0; // Posição do carro na tela (-1 a 1)
+let carVisualX = 0; 
 let roadOffset = 0;
 let score = 0;
 let isRunning = false;
-let objects = [];
+let npcs = [];
 
 const GAME_SPEED = 1; 
-const CAR_SPEED = 0.02; // Velocidade do movimento lateral do carro
+const CAR_MOVE_SPEED = 0.02; 
 
 function resize() {
     width = window.innerWidth;
@@ -77,32 +77,26 @@ handleTouch('btnLeft', 'left');
 handleTouch('btnRight', 'right');
 
 function startGame() {
-    score = 0; carVisualX = 0; roadOffset = 0; objects = [];
+    score = 0; carVisualX = 0; roadOffset = 0; npcs = [];
     isRunning = true;
     menu.style.display = 'none';
     gameOverScreen.style.display = 'none';
-    for(let i = 0; i < 40; i++) createScenery(i * 30);
     animate();
-}
-
-function createScenery(z) {
-    const side = Math.random() > 0.5 ? 1.8 : -1.8; // Prédios fixos nas laterais
-    objects.push({ z, x: side, type: 'building', color: '#e67e22' });
 }
 
 function animate() {
     if(!isRunning) return;
     roadOffset += GAME_SPEED;
-    score += 0.1;
+    score += 0.05;
     hud.innerText = `DISTÂNCIA: ${Math.floor(score)}m`;
 
-    // Agora o CARRO se move na tela, não a câmera
-    if(input.left) carVisualX -= CAR_SPEED;
-    if(input.right) carVisualX += CAR_SPEED;
-    carVisualX = Math.max(-0.8, Math.min(0.8, carVisualX)); // Limita o carro à largura da estrada
+    if(input.left) carVisualX -= CAR_MOVE_SPEED;
+    if(input.right) carVisualX += CAR_MOVE_SPEED;
+    carVisualX = Math.max(-0.8, Math.min(0.8, carVisualX));
 
+    // Gerar carros inimigos (apenas na rua)
     if(Math.random() < 0.008) {
-        objects.push({ z: 1000, x: (Math.random() * 1.2) - 0.6, type: 'npc', color: '#e74c3c' });
+        npcs.push({ z: 1000, x: (Math.random() * 1.2) - 0.6, color: Math.random() > 0.5 ? '#e74c3c' : '#f1c40f' });
     }
 
     draw();
@@ -110,12 +104,12 @@ function animate() {
 }
 
 function draw() {
-    // 1. Céu e Grama
+    // 1. Fundo (Céu e Grama)
     ctx.fillStyle = "#87CEEB"; ctx.fillRect(0, 0, width, horizon);
     ctx.fillStyle = "#4CAF50"; ctx.fillRect(0, horizon, width, height - horizon);
 
     // 2. Estrada Fixa
-    ctx.fillStyle = "#666";
+    ctx.fillStyle = "#444";
     ctx.beginPath();
     ctx.moveTo(width/2 - 20, horizon);
     ctx.lineTo(width/2 + 20, horizon);
@@ -123,63 +117,55 @@ function draw() {
     ctx.lineTo(width * -0.5, height);
     ctx.fill();
 
-    // Faixas laterais brancas (Fixas)
-    ctx.strokeStyle = "white"; ctx.lineWidth = 5;
+    // Faixas laterais
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(width/2 - 25, horizon); ctx.lineTo(width * 1.1, height);
-    ctx.moveTo(width/2 + 25, horizon); ctx.lineTo(width * -0.1, height);
+    ctx.moveTo(width/2 - 25, horizon); ctx.lineTo(width * -0.2, height);
+    ctx.moveTo(width/2 + 25, horizon); ctx.lineTo(width * 1.2, height);
     ctx.stroke();
 
-    // Faixa central amarela
+    // Faixa central amarela animada
     ctx.strokeStyle = "#FFD700"; ctx.setLineDash([20, 40]);
-    ctx.lineDashOffset = -roadOffset * 2;
+    ctx.lineDashOffset = -roadOffset * 1.5;
     ctx.beginPath(); ctx.moveTo(width/2, horizon); ctx.lineTo(width/2, height); ctx.stroke();
     ctx.setLineDash([]);
 
-    // 3. Objetos (Prédios e NPCs)
-    objects.sort((a, b) => b.z - a.z);
-    for(let i = objects.length - 1; i >= 0; i--) {
-        let obj = objects[i];
-        obj.z -= GAME_SPEED;
-        if(obj.z < 1) {
-            if(obj.type === 'npc') { objects.splice(i, 1); continue; }
-            else obj.z = 1000;
-        }
+    // 3. Desenhar Carros no trânsito
+    npcs.sort((a, b) => b.z - a.z);
+    for(let i = npcs.length - 1; i >= 0; i--) {
+        let n = npcs[i];
+        n.z -= GAME_SPEED;
+        if(n.z < 1) { npcs.splice(i, 1); continue; }
 
-        const scale = 30 / obj.z;
-        // Posição X calculada sem playerX (Câmera parada)
-        const xPos = width/2 + (obj.x) * scale * (width * 0.5);
+        const scale = 30 / n.z;
+        const xPos = width/2 + (n.x) * scale * (width * 0.5);
         const yPos = horizon + (scale * (height * 0.6));
         const size = scale * 120;
 
-        if(obj.type === 'building') {
-            ctx.fillStyle = obj.color;
-            ctx.fillRect(xPos - size, yPos - size*4, size*2, size*4);
-        } else if(obj.type === 'npc') {
-            ctx.fillStyle = obj.color;
-            ctx.fillRect(xPos - size/2, yPos - size/3, size, size/3);
-            // Colisão baseada na posição do carro na tela
-            if(obj.z < 50 && obj.z > 10 && Math.abs(obj.x - carVisualX) < 0.25) endGame();
+        ctx.fillStyle = n.color;
+        ctx.fillRect(xPos - size/2, yPos - size/3, size, size/3);
+
+        // Colisão com o seu carro
+        if(n.z < 50 && n.z > 10 && Math.abs(n.x - carVisualX) < 0.25) {
+            isRunning = false;
+            gameOverScreen.style.display = 'flex';
         }
     }
 
-    // 4. Carro do Jogador (Azul) - Se movendo lateralmente
+    // 4. Carro do Jogador (Azul)
     const pSize = width > 600 ? 120 : 80;
-    // O carro se move conforme carVisualX
     const px = (width / 2) + (carVisualX * (width * 0.4)); 
     const py = height - 120;
 
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.fillRect(px - pSize/2, py + pSize/3, pSize, 15); // Sombra
+    // Sombra
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.fillRect(px - pSize/2, py + pSize/3, pSize, 10);
+    // Corpo
     ctx.fillStyle = "#2196F3";
-    ctx.fillRect(px - pSize/2, py, pSize, pSize/2.5); // Corpo
+    ctx.fillRect(px - pSize/2, py, pSize, pSize/2.5);
+    // Vidro
     ctx.fillStyle = "#add8e6";
-    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, pSize/10); // Vidro
-}
-
-function endGame() {
-    isRunning = false;
-    gameOverScreen.style.display = 'flex';
+    ctx.fillRect(px - pSize/2 + 10, py + 5, pSize - 20, pSize/10);
 }
 </script>
 </body>
