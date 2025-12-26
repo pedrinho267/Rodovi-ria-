@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dash Mobile Clone</title>
+    <title>Dash Mobile Ultra</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #200040; font-family: Arial, sans-serif; }
-        canvas { display: block; background: linear-gradient(#4a0080, #200040); }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #0a001a; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 30px; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px #00d4ff; }
     </style>
 </head>
 <body>
-    <div id="ui">Score: 0</div>
+    <div id="ui">SCORE: 0</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -19,141 +19,169 @@
         const ctx = canvas.getContext('2d');
         const ui = document.getElementById('ui');
 
-        // Ajuste de tela
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Configurações do Jogo
-        let gravity = 0.6;
+        // Configurações
+        let gravity = 0.7;
         let score = 0;
         let gameActive = true;
-        let speed = 5;
+        let speed = 7;
+        const floorY = canvas.height - 80;
+
+        // Sons via Web Audio API (sem arquivos externos)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playJumpSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
 
         const player = {
-            x: 50,
-            y: canvas.height - 100,
-            size: 40,
-            dy: 0,
-            jumpForce: -12,
-            grounded: false,
-            rotation: 0
+            x: 80, y: floorY - 40, size: 40, dy: 0, 
+            jumpForce: -14, grounded: false, rotation: 0
         };
 
         const obstacles = [];
-        const floorY = canvas.height - 50;
+        const particles = [];
 
-        // Input Mobile (Toque)
+        function createParticles(x, y, color, count = 5) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
         window.addEventListener('touchstart', (e) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             if (!gameActive) {
                 resetGame();
             } else if (player.grounded) {
                 player.dy = player.jumpForce;
                 player.grounded = false;
+                playJumpSound();
+                createParticles(player.x, player.y + player.size, "#00ff00", 10);
             }
         });
 
         function spawnObstacle() {
             if (!gameActive) return;
+            const type = Math.random() > 0.7 ? 2 : 1; 
             const size = 40;
-            obstacles.push({
-                x: canvas.width + 100,
-                y: floorY - size,
-                width: size,
-                height: size
-            });
-            
-            // Spawn aleatório para o próximo obstáculo
-            setTimeout(spawnObstacle, 1000 + Math.random() * 2000);
+            obstacles.push({ x: canvas.width + 100, y: floorY - size, width: size * type, height: size, type: type });
+            setTimeout(spawnObstacle, 1000 + Math.random() * 1500);
         }
 
         function resetGame() {
-            score = 0;
-            speed = 5;
-            obstacles.length = 0;
-            player.y = floorY - player.size;
-            player.dy = 0;
-            player.rotation = 0;
-            gameActive = true;
-            ui.innerHTML = "Score: 0";
-            requestAnimationFrame(update);
+            score = 0; speed = 7; obstacles.length = 0; particles.length = 0;
+            player.y = floorY - player.size; player.dy = 0; player.rotation = 0;
+            gameActive = true; ui.innerHTML = "SCORE: 0";
+            update();
         }
 
         function update() {
             if (!gameActive) return;
+            ctx.fillStyle = "#0a001a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Desenhar Chão Neon
+            ctx.fillStyle = "#1a0033";
+            ctx.fillRect(0, floorY, canvas.width, 80);
+            ctx.strokeStyle = "#00d4ff";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY);
+            ctx.stroke();
 
-            // Chão
-            ctx.fillStyle = "#10002b";
-            ctx.fillRect(0, floorY, canvas.width, 50);
+            // Partículas
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if (p.life <= 0) particles.splice(i, 1);
+                else {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.fillRect(p.x, p.y, 4, 4);
+                    ctx.globalAlpha = 1;
+                }
+            }
 
-            // Física do Jogador
+            // Jogador
             player.dy += gravity;
             player.y += player.dy;
-
             if (player.y + player.size > floorY) {
                 player.y = floorY - player.size;
                 player.dy = 0;
                 player.grounded = true;
-                // Alinha rotação ao chão
                 player.rotation = Math.round(player.rotation / 90) * 90;
             } else {
-                player.rotation += 5; // Gira no ar
+                player.rotation += 6;
+                // Rastro
+                if(Math.random() > 0.5) createParticles(player.x, player.y + 20, "rgba(0, 255, 0, 0.5)", 1);
             }
 
-            // Desenhar Jogador (Quadrado Neon)
             ctx.save();
             ctx.translate(player.x + player.size/2, player.y + player.size/2);
             ctx.rotate(player.rotation * Math.PI / 180);
-            ctx.strokeStyle = "#00ff00";
-            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15; ctx.shadowColor = "#00ff00";
+            ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 3;
             ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
-            ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
+            ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
             ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
             ctx.restore();
+            ctx.shadowBlur = 0;
 
-            // Obstáculos (Triângulos/Spikes)
+            // Obstáculos
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
                 obs.x -= speed;
-
-                // Desenha Triângulo
                 ctx.fillStyle = "#ff0055";
-                ctx.beginPath();
-                ctx.moveTo(obs.x, obs.y + obs.height);
-                ctx.lineTo(obs.x + obs.width / 2, obs.y);
-                ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
-                ctx.fill();
+                ctx.shadowBlur = 10; ctx.shadowColor = "#ff0055";
+                for(let n = 0; n < obs.type; n++) {
+                    let startX = obs.x + (n * 40);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, obs.y + obs.height);
+                    ctx.lineTo(startX + 20, obs.y);
+                    ctx.lineTo(startX + 40, obs.y + obs.height);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
 
-                // Colisão simples
-                if (player.x < obs.x + obs.width - 5 &&
-                    player.x + player.size > obs.x + 5 &&
-                    player.y + player.size > obs.y + 5) {
+                if (player.x < obs.x + obs.width - 12 && player.x + player.size > obs.x + 12 &&
+                    player.y + player.size > obs.y + 10) {
+                    gameActive = false;
                     gameOver();
                 }
 
-                // Remove obstáculos fora da tela e soma score
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
                     score++;
-                    speed += 0.1; // Aumenta dificuldade
-                    ui.innerHTML = "Score: " + score;
+                    speed += 0.08;
+                    ui.innerHTML = "SCORE: " + score;
                 }
             }
-
             requestAnimationFrame(update);
         }
 
         function gameOver() {
-            gameActive = false;
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillStyle = "rgba(0,0,0,0.8)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "white";
-            ctx.textAlign = "center";
-            ctx.font = "40px Arial";
-            ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
-            ctx.font = "20px Arial";
-            ctx.fillText("Toque para reiniciar", canvas.width/2, canvas.height/2 + 40);
+            ctx.fillStyle = "white"; ctx.textAlign = "center";
+            ctx.font = "bold 40px Arial"; ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+            ctx.font = "20px Arial"; ctx.fillText("Toque para recomeçar", canvas.width/2, canvas.height/2 + 50);
         }
 
         spawnObstacle();
