@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dash Mobile Ultra</title>
+    <title>Dash Mobile - Spikes Aleatórios</title>
     <style>
         body { margin: 0; overflow: hidden; background: #0a001a; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
@@ -29,20 +29,22 @@
         let speed = 7;
         const floorY = canvas.height - 80;
 
-        // Sons via Web Audio API (sem arquivos externos)
+        // Sons básicos
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playJumpSound() {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } catch(e) {}
         }
 
         const player = {
@@ -73,16 +75,33 @@
                 player.dy = player.jumpForce;
                 player.grounded = false;
                 playJumpSound();
-                createParticles(player.x, player.y + player.size, "#00ff00", 10);
+                createParticles(player.x, player.y + player.size, "#00ff00", 8);
             }
         });
 
         function spawnObstacle() {
             if (!gameActive) return;
-            const type = Math.random() > 0.7 ? 2 : 1; 
-            const size = 40;
-            obstacles.push({ x: canvas.width + 100, y: floorY - size, width: size * type, height: size, type: type });
-            setTimeout(spawnObstacle, 1000 + Math.random() * 1500);
+
+            // LÓGICA DE ALEATORIEDADE:
+            // 50% chance de 1 espinho, 35% de 2 espinhos, 15% de 3 espinhos
+            const rand = Math.random();
+            let count = 1;
+            if (rand > 0.5 && rand <= 0.85) count = 2;
+            else if (rand > 0.85) count = 3;
+
+            const spikeSize = 40;
+            
+            obstacles.push({
+                x: canvas.width + 100,
+                y: floorY - spikeSize,
+                width: spikeSize * count,
+                height: spikeSize,
+                count: count // Quantos espinhos tem nesse grupo
+            });
+            
+            // Tempo para o próximo obstáculo (diminui conforme a velocidade aumenta)
+            let nextSpawn = Math.max(800, 1800 - (speed * 50) + Math.random() * 1000);
+            setTimeout(spawnObstacle, nextSpawn);
         }
 
         function resetGame() {
@@ -97,27 +116,25 @@
             ctx.fillStyle = "#0a001a";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Desenhar Chão Neon
+            // Chão Neon
             ctx.fillStyle = "#1a0033";
             ctx.fillRect(0, floorY, canvas.width, 80);
             ctx.strokeStyle = "#00d4ff";
             ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY);
-            ctx.stroke();
+            ctx.strokeRect(-1, floorY, canvas.width + 2, 2);
 
             // Partículas
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                p.x += p.vx; p.y += p.vy; p.life -= 0.03;
                 if (p.life <= 0) particles.splice(i, 1);
                 else {
                     ctx.fillStyle = p.color;
                     ctx.globalAlpha = p.life;
-                    ctx.fillRect(p.x, p.y, 4, 4);
-                    ctx.globalAlpha = 1;
+                    ctx.fillRect(p.x, p.y, 3, 3);
                 }
             }
+            ctx.globalAlpha = 1;
 
             // Jogador
             player.dy += gravity;
@@ -129,8 +146,7 @@
                 player.rotation = Math.round(player.rotation / 90) * 90;
             } else {
                 player.rotation += 6;
-                // Rastro
-                if(Math.random() > 0.5) createParticles(player.x, player.y + 20, "rgba(0, 255, 0, 0.5)", 1);
+                if(Math.random() > 0.6) createParticles(player.x, player.y + 20, "rgba(0, 255, 0, 0.3)", 1);
             }
 
             ctx.save();
@@ -142,34 +158,43 @@
             ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
             ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
             ctx.restore();
-            ctx.shadowBlur = 0;
 
-            // Obstáculos
+            // Obstáculos (Desenho Corrigido)
             for (let i = obstacles.length - 1; i >= 0; i--) {
-                const obs = obstacles[i];
-                obs.x -= speed;
-                ctx.fillStyle = "#ff0055";
+                const group = obstacles[i];
+                group.x -= speed;
+
                 ctx.shadowBlur = 10; ctx.shadowColor = "#ff0055";
-                for(let n = 0; n < obs.type; n++) {
-                    let startX = obs.x + (n * 40);
+                ctx.fillStyle = "#ff0055";
+
+                // Desenha cada espinho do grupo individualmente
+                for(let n = 0; n < group.count; n++) {
+                    let startX = group.x + (n * 40);
                     ctx.beginPath();
-                    ctx.moveTo(startX, obs.y + obs.height);
-                    ctx.lineTo(startX + 20, obs.y);
-                    ctx.lineTo(startX + 40, obs.y + obs.height);
+                    ctx.moveTo(startX, floorY); // Base esquerda
+                    ctx.lineTo(startX + 20, floorY - 40); // Topo (ponta)
+                    ctx.lineTo(startX + 40, floorY); // Base direita
                     ctx.fill();
+                    
+                    // Detalhe interno branco para brilho
+                    ctx.strokeStyle = "white";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
                 }
                 ctx.shadowBlur = 0;
 
-                if (player.x < obs.x + obs.width - 12 && player.x + player.size > obs.x + 12 &&
-                    player.y + player.size > obs.y + 10) {
+                // Colisão (Ajustada para os grupos)
+                if (player.x < group.x + group.width - 10 && 
+                    player.x + player.size > group.x + 10 &&
+                    player.y + player.size > floorY - 35) {
                     gameActive = false;
                     gameOver();
                 }
 
-                if (obs.x + obs.width < 0) {
+                if (group.x + group.width < 0) {
                     obstacles.splice(i, 1);
                     score++;
-                    speed += 0.08;
+                    speed += 0.1;
                     ui.innerHTML = "SCORE: " + score;
                 }
             }
@@ -180,10 +205,11 @@
             ctx.fillStyle = "rgba(0,0,0,0.8)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "white"; ctx.textAlign = "center";
-            ctx.font = "bold 40px Arial"; ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
-            ctx.font = "20px Arial"; ctx.fillText("Toque para recomeçar", canvas.width/2, canvas.height/2 + 50);
+            ctx.font = "bold 40px Arial"; ctx.fillText("BATEU!", canvas.width/2, canvas.height/2);
+            ctx.font = "20px Arial"; ctx.fillText("Toque para reiniciar", canvas.width/2, canvas.height/2 + 50);
         }
 
+        // Inicia o spawn de obstáculos
         spawnObstacle();
         update();
     </script>
