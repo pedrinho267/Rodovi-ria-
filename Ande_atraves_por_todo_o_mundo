@@ -3,33 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dash Mobile - Spikes Aleatórios</title>
+    <title>Dash Mobile - Biomas</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #0a001a; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; transition: background 1s; }
         canvas { display: block; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 30px; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px #00d4ff; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 24px; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 4px #000; }
+        #level-name { position: absolute; top: 60px; width: 100%; text-align: center; color: #fff; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
     </style>
 </head>
 <body>
     <div id="ui">SCORE: 0</div>
+    <div id="level-name">ESCURIDÃO</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const ui = document.getElementById('ui');
+        const levelNameDisplay = document.getElementById('level-name');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Configurações
         let gravity = 0.7;
         let score = 0;
         let gameActive = true;
         let speed = 7;
         const floorY = canvas.height - 80;
 
-        // Sons básicos
+        // Configuração de Biomas
+        const biomes = [
+            { name: "Escuridão", bg: "#000000", floor: "#1a1a1a", spike: "#ff0055", player: "#00ff00" },
+            { name: "Floresta", bg: "#1b4332", floor: "#2d6a4f", spike: "#74c69d", player: "#fff" },
+            { name: "Deserto", bg: "#ffb703", floor: "#fb8500", spike: "#8ecae6", player: "#023047" },
+            { name: "Neve", bg: "#caf0f8", floor: "#90e0ef", spike: "#0077b6", player: "#03045e" },
+            { name: "Nether", bg: "#370617", floor: "#6a040f", spike: "#ffb703", player: "#ff0000" }
+        ];
+        let currentBiome = biomes[0];
+
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playJumpSound() {
             try {
@@ -38,20 +49,14 @@
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(150, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
             } catch(e) {}
         }
 
-        const player = {
-            x: 80, y: floorY - 40, size: 40, dy: 0, 
-            jumpForce: -14, grounded: false, rotation: 0
-        };
-
+        const player = { x: 80, y: floorY - 40, size: 40, dy: 0, jumpForce: -14, grounded: false, rotation: 0 };
         const obstacles = [];
         const particles = [];
 
@@ -59,8 +64,8 @@
             for (let i = 0; i < count; i++) {
                 particles.push({
                     x: x, y: y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
                     life: 1.0,
                     color: color
                 });
@@ -69,58 +74,52 @@
 
         window.addEventListener('touchstart', (e) => {
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (!gameActive) {
-                resetGame();
-            } else if (player.grounded) {
+            if (!gameActive) { resetGame(); } 
+            else if (player.grounded) {
                 player.dy = player.jumpForce;
                 player.grounded = false;
                 playJumpSound();
-                createParticles(player.x, player.y + player.size, "#00ff00", 8);
+                createParticles(player.x, player.y + player.size, currentBiome.player, 8);
             }
         });
 
         function spawnObstacle() {
             if (!gameActive) return;
-
-            // LÓGICA DE ALEATORIEDADE:
-            // 50% chance de 1 espinho, 35% de 2 espinhos, 15% de 3 espinhos
             const rand = Math.random();
-            let count = 1;
-            if (rand > 0.5 && rand <= 0.85) count = 2;
-            else if (rand > 0.85) count = 3;
-
+            let count = rand > 0.85 ? 3 : (rand > 0.5 ? 2 : 1);
             const spikeSize = 40;
-            
-            obstacles.push({
-                x: canvas.width + 100,
-                y: floorY - spikeSize,
-                width: spikeSize * count,
-                height: spikeSize,
-                count: count // Quantos espinhos tem nesse grupo
-            });
-            
-            // Tempo para o próximo obstáculo (diminui conforme a velocidade aumenta)
-            let nextSpawn = Math.max(800, 1800 - (speed * 50) + Math.random() * 1000);
-            setTimeout(spawnObstacle, nextSpawn);
+            obstacles.push({ x: canvas.width + 100, y: floorY - spikeSize, width: spikeSize * count, height: spikeSize, count: count });
+            setTimeout(spawnObstacle, Math.max(700, 1700 - (speed * 40) + Math.random() * 800));
         }
 
         function resetGame() {
             score = 0; speed = 7; obstacles.length = 0; particles.length = 0;
             player.y = floorY - player.size; player.dy = 0; player.rotation = 0;
+            updateBiome();
             gameActive = true; ui.innerHTML = "SCORE: 0";
             update();
         }
 
+        function updateBiome() {
+            let index = Math.floor(score / 10); // Muda a cada 10 pontos
+            if (index >= biomes.length) index = biomes.length - 1;
+            currentBiome = biomes[index];
+            levelNameDisplay.innerHTML = currentBiome.name;
+            levelNameDisplay.style.color = currentBiome.spike;
+        }
+
         function update() {
             if (!gameActive) return;
-            ctx.fillStyle = "#0a001a";
+            
+            // Fundo dinâmico
+            ctx.fillStyle = currentBiome.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Chão Neon
-            ctx.fillStyle = "#1a0033";
+            // Chão
+            ctx.fillStyle = currentBiome.floor;
             ctx.fillRect(0, floorY, canvas.width, 80);
-            ctx.strokeStyle = "#00d4ff";
-            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(255,255,255,0.3)";
+            ctx.lineWidth = 2;
             ctx.strokeRect(-1, floorY, canvas.width + 2, 2);
 
             // Partículas
@@ -141,51 +140,35 @@
             player.y += player.dy;
             if (player.y + player.size > floorY) {
                 player.y = floorY - player.size;
-                player.dy = 0;
-                player.grounded = true;
+                player.dy = 0; player.grounded = true;
                 player.rotation = Math.round(player.rotation / 90) * 90;
             } else {
                 player.rotation += 6;
-                if(Math.random() > 0.6) createParticles(player.x, player.y + 20, "rgba(0, 255, 0, 0.3)", 1);
             }
 
             ctx.save();
             ctx.translate(player.x + player.size/2, player.y + player.size/2);
             ctx.rotate(player.rotation * Math.PI / 180);
-            ctx.shadowBlur = 15; ctx.shadowColor = "#00ff00";
-            ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 3;
+            ctx.shadowBlur = 10; ctx.shadowColor = currentBiome.player;
+            ctx.strokeStyle = currentBiome.player; ctx.lineWidth = 3;
             ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
-            ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
-            ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
             ctx.restore();
 
-            // Obstáculos (Desenho Corrigido)
+            // Obstáculos
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const group = obstacles[i];
                 group.x -= speed;
-
-                ctx.shadowBlur = 10; ctx.shadowColor = "#ff0055";
-                ctx.fillStyle = "#ff0055";
-
-                // Desenha cada espinho do grupo individualmente
+                ctx.fillStyle = currentBiome.spike;
                 for(let n = 0; n < group.count; n++) {
                     let startX = group.x + (n * 40);
                     ctx.beginPath();
-                    ctx.moveTo(startX, floorY); // Base esquerda
-                    ctx.lineTo(startX + 20, floorY - 40); // Topo (ponta)
-                    ctx.lineTo(startX + 40, floorY); // Base direita
+                    ctx.moveTo(startX, floorY);
+                    ctx.lineTo(startX + 20, floorY - 40);
+                    ctx.lineTo(startX + 40, floorY);
                     ctx.fill();
-                    
-                    // Detalhe interno branco para brilho
-                    ctx.strokeStyle = "white";
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
                 }
-                ctx.shadowBlur = 0;
 
-                // Colisão (Ajustada para os grupos)
-                if (player.x < group.x + group.width - 10 && 
-                    player.x + player.size > group.x + 10 &&
+                if (player.x < group.x + group.width - 12 && player.x + player.size > group.x + 12 &&
                     player.y + player.size > floorY - 35) {
                     gameActive = false;
                     gameOver();
@@ -196,6 +179,7 @@
                     score++;
                     speed += 0.1;
                     ui.innerHTML = "SCORE: " + score;
+                    updateBiome();
                 }
             }
             requestAnimationFrame(update);
@@ -204,12 +188,11 @@
         function gameOver() {
             ctx.fillStyle = "rgba(0,0,0,0.8)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "white"; ctx.textAlign = "center";
-            ctx.font = "bold 40px Arial"; ctx.fillText("BATEU!", canvas.width/2, canvas.height/2);
-            ctx.font = "20px Arial"; ctx.fillText("Toque para reiniciar", canvas.width/2, canvas.height/2 + 50);
+            ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+            ctx.font = "bold 30px Arial"; ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+            ctx.font = "18px Arial"; ctx.fillText("Toque para reiniciar", canvas.width/2, canvas.height/2 + 40);
         }
 
-        // Inicia o spawn de obstáculos
         spawnObstacle();
         update();
     </script>
