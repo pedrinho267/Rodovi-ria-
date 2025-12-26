@@ -1,223 +1,163 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>Perigo nas Bordas</title>
-<style>
-html,body{
-    margin:0;
-    padding:0;
-    overflow:hidden;
-    font-family: Arial, Helvetica, sans-serif;
-    background:#6ec6ff;
-}
-
-#ui{
-    position:absolute;
-    top:10px;
-    width:100%;
-    text-align:center;
-    color:white;
-    pointer-events:none;
-}
-
-#ui .top{
-    display:flex;
-    justify-content:space-between;
-    padding:0 20px;
-    font-size:16px;
-}
-
-#alerta{
-    margin-top:20px;
-}
-
-#btnStart{
-    margin-top:15px;
-    padding:12px 30px;
-    background:#7cb342;
-    border-radius:6px;
-    display:inline-block;
-    font-weight:bold;
-    cursor:pointer;
-    pointer-events:auto;
-}
-
-canvas{
-    display:block;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dash Mobile Clone</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #200040; font-family: Arial, sans-serif; }
+        canvas { display: block; background: linear-gradient(#4a0080, #200040); }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; pointer-events: none; }
+    </style>
 </head>
 <body>
+    <div id="ui">Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
 
-<div id="ui">
-    <div class="top">
-        <div>KM: <span id="km">0</span><br>DISTÂNCIA</div>
-        <div>Horizon <span id="nivel">1</span></div>
-        <div id="colidiu" style="color:red;display:none;">COLIDIU!</div>
-    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
 
-    <div id="alerta">
-        <h1>PERIGO NAS BORDAS!</h1>
-        <p>Carros vermelhos surgem nas laterais.</p>
-        <div id="btnStart">INICIAR</div>
-    </div>
-</div>
+        // Ajuste de tela
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-<canvas id="game"></canvas>
+        // Configurações do Jogo
+        let gravity = 0.6;
+        let score = 0;
+        let gameActive = true;
+        let speed = 5;
 
-<script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+        const player = {
+            x: 50,
+            y: canvas.height - 100,
+            size: 40,
+            dy: 0,
+            jumpForce: -12,
+            grounded: false,
+            rotation: 0
+        };
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+        const obstacles = [];
+        const floorY = canvas.height - 50;
 
-let jogar = false;
-let velocidade = 2;
-let km = 0;
-
-const carroPlayer = {
-    x: canvas.width/2,
-    y: canvas.height*0.75,
-    w: 40,
-    h: 70
-};
-
-let inimigos = [];
-
-// ================= RUA =================
-function desenharEstrada(){
-    // Grama
-    ctx.fillStyle = "#5cb85c";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    // Estrada (perspectiva)
-    const centro = canvas.width/2;
-    const base = 360;
-    const topo = 80;
-
-    ctx.fillStyle = "#2e2e2e";
-    ctx.beginPath();
-    ctx.moveTo(centro - topo, 0);
-    ctx.lineTo(centro + topo, 0);
-    ctx.lineTo(centro + base, canvas.height);
-    ctx.lineTo(centro - base, canvas.height);
-    ctx.closePath();
-    ctx.fill();
-
-    // Bordas brancas
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(centro - topo, 0);
-    ctx.lineTo(centro - base, canvas.height);
-    ctx.moveTo(centro + topo, 0);
-    ctx.lineTo(centro + base, canvas.height);
-    ctx.stroke();
-
-    // Faixa amarela central
-    ctx.strokeStyle = "yellow";
-    ctx.lineWidth = 4;
-    ctx.setLineDash([30,25]);
-    ctx.lineDashOffset = -km * 50;
-    ctx.beginPath();
-    ctx.moveTo(centro,0);
-    ctx.lineTo(centro,canvas.height);
-    ctx.stroke();
-    ctx.setLineDash([]);
-}
-
-// ================= CARROS =================
-function desenharCarro(c){
-    ctx.fillStyle = c.cor;
-    ctx.fillRect(c.x - c.w/2, c.y, c.w, c.h);
-}
-
-function criarInimigo(){
-    const tipo = Math.random() < 0.4 ? "red" : "yellow";
-    let posX;
-    let velExtra = 0;
-
-    if(tipo === "red"){
-        // Bordas
-        posX = Math.random() < 0.5 
-            ? canvas.width/2 - 150 
-            : canvas.width/2 + 150;
-        velExtra = 2;
-    }else{
-        // Centro
-        const faixas = [-90, 0, 90];
-        posX = canvas.width/2 + faixas[Math.floor(Math.random()*3)];
-    }
-
-    inimigos.push({
-        x: posX,
-        y: -100,
-        w: 40,
-        h: 70,
-        cor: tipo,
-        velocidade: velExtra
-    });
-}
-
-function colisao(a,b){
-    return a.x < b.x + b.w &&
-           a.x + a.w > b.x &&
-           a.y < b.y + b.h &&
-           a.y + a.h > b.y;
-}
-
-// ================= LOOP =================
-function loop(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    desenharEstrada();
-
-    if(jogar){
-        km += 0.02;
-        velocidade += 0.0006;
-        document.getElementById("km").innerText = km.toFixed(1);
-
-        if(Math.random() < 0.025){
-            criarInimigo();
-        }
-
-        inimigos.forEach(i=>{
-            i.y += (velocidade*3) + i.velocidade;
-            desenharCarro(i);
-
-            if(colisao(
-                {x:carroPlayer.x-carroPlayer.w/2,y:carroPlayer.y,w:carroPlayer.w,h:carroPlayer.h},
-                {x:i.x-i.w/2,y:i.y,w:i.w,h:i.h}
-            )){
-                jogar = false;
-                document.getElementById("colidiu").style.display="block";
-                document.getElementById("alerta").style.display="block";
+        // Input Mobile (Toque)
+        window.addEventListener('touchstart', (e) => {
+            if (!gameActive) {
+                resetGame();
+            } else if (player.grounded) {
+                player.dy = player.jumpForce;
+                player.grounded = false;
             }
         });
 
-        inimigos = inimigos.filter(i=>i.y < canvas.height+100);
-    }
+        function spawnObstacle() {
+            if (!gameActive) return;
+            const size = 40;
+            obstacles.push({
+                x: canvas.width + 100,
+                y: floorY - size,
+                width: size,
+                height: size
+            });
+            
+            // Spawn aleatório para o próximo obstáculo
+            setTimeout(spawnObstacle, 1000 + Math.random() * 2000);
+        }
 
-    desenharCarro({x:carroPlayer.x,y:carroPlayer.y,w:carroPlayer.w,h:carroPlayer.h,cor:"blue"});
-    requestAnimationFrame(loop);
-}
+        function resetGame() {
+            score = 0;
+            speed = 5;
+            obstacles.length = 0;
+            player.y = floorY - player.size;
+            player.dy = 0;
+            player.rotation = 0;
+            gameActive = true;
+            ui.innerHTML = "Score: 0";
+            requestAnimationFrame(update);
+        }
 
-// ================= CONTROLES =================
-window.addEventListener("mousemove",e=>{
-    carroPlayer.x = e.clientX;
-});
+        function update() {
+            if (!gameActive) return;
 
-document.getElementById("btnStart").onclick = ()=>{
-    inimigos = [];
-    km = 0;
-    velocidade = 2;
-    jogar = true;
-    document.getElementById("alerta").style.display="none";
-    document.getElementById("colidiu").style.display="none";
-};
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-loop();
-</script>
+            // Chão
+            ctx.fillStyle = "#10002b";
+            ctx.fillRect(0, floorY, canvas.width, 50);
+
+            // Física do Jogador
+            player.dy += gravity;
+            player.y += player.dy;
+
+            if (player.y + player.size > floorY) {
+                player.y = floorY - player.size;
+                player.dy = 0;
+                player.grounded = true;
+                // Alinha rotação ao chão
+                player.rotation = Math.round(player.rotation / 90) * 90;
+            } else {
+                player.rotation += 5; // Gira no ar
+            }
+
+            // Desenhar Jogador (Quadrado Neon)
+            ctx.save();
+            ctx.translate(player.x + player.size/2, player.y + player.size/2);
+            ctx.rotate(player.rotation * Math.PI / 180);
+            ctx.strokeStyle = "#00ff00";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
+            ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
+            ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
+            ctx.restore();
+
+            // Obstáculos (Triângulos/Spikes)
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.x -= speed;
+
+                // Desenha Triângulo
+                ctx.fillStyle = "#ff0055";
+                ctx.beginPath();
+                ctx.moveTo(obs.x, obs.y + obs.height);
+                ctx.lineTo(obs.x + obs.width / 2, obs.y);
+                ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                ctx.fill();
+
+                // Colisão simples
+                if (player.x < obs.x + obs.width - 5 &&
+                    player.x + player.size > obs.x + 5 &&
+                    player.y + player.size > obs.y + 5) {
+                    gameOver();
+                }
+
+                // Remove obstáculos fora da tela e soma score
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                    score++;
+                    speed += 0.1; // Aumenta dificuldade
+                    ui.innerHTML = "Score: " + score;
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.textAlign = "center";
+            ctx.font = "40px Arial";
+            ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+            ctx.font = "20px Arial";
+            ctx.fillText("Toque para reiniciar", canvas.width/2, canvas.height/2 + 40);
+        }
+
+        spawnObstacle();
+        update();
+    </script>
 </body>
 </html>
