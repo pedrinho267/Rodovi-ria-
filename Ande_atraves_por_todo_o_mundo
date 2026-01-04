@@ -3,35 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Dash - Score Esquerdo</title>
+    <title>Neon Dash Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: manipulation; }
+        body { 
+            margin: 0; 
+            padding: 0;
+            overflow: hidden; 
+            background: #000; 
+            font-family: 'Arial Black', sans-serif; 
+            touch-action: none; /* Impede zoom acidental no mobile */
+        }
         canvas { display: block; }
         
-        /* POSIÇÃO DO SCORE NO CANTO ESQUERDO */
+        /* INTERFACE REVISADA */
         #ui-container { 
             position: absolute; 
-            top: 20px; 
-            left: 20px; /* Alinhado à esquerda */
+            top: 30px; 
+            left: 20px; 
             color: white; 
             pointer-events: none; 
-            z-index: 10; 
-            text-align: left;
+            z-index: 100; 
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
         
         #score { 
-            font-size: 32px; 
-            font-weight: bold; 
-            text-shadow: 0 0 10px #fff; 
+            font-size: 45px; 
+            line-height: 1;
+            text-shadow: 0 0 15px rgba(255,255,255,0.8);
             margin: 0;
         }
         
         #level-name { 
-            font-size: 14px; 
+            font-size: 16px; 
             text-transform: uppercase; 
             letter-spacing: 2px; 
-            margin-top: 2px; 
-            opacity: 0.9;
+            margin-top: 5px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -55,7 +64,7 @@
         let score = 0;
         let speed = 7;
         let gravity = 0.7;
-        let lastScoreTime = Date.now();
+        let lastTimeScore = Date.now();
         const floorY = canvas.height - 80;
 
         const biomes = [
@@ -64,22 +73,20 @@
         ];
         let currentBiome = biomes[0];
 
-        const player = { x: 80, y: 0, size: 40, dy: 0, jumpForce: -14, grounded: false, rotation: 0 };
-        player.y = floorY - player.size;
-
+        const player = { x: 80, y: floorY - 40, size: 40, dy: 0, jumpForce: -14, grounded: false, rotation: 0 };
         const obstacles = [];
         const particles = [];
 
+        // Toque Mobile
         window.addEventListener('touchstart', (e) => {
-            e.preventDefault();
             if (!gameActive) {
                 resetGame();
             } else if (player.grounded) {
                 player.dy = player.jumpForce;
                 player.grounded = false;
-                createParticles(player.x, player.y + player.size, currentBiome.player, 8);
+                createParticles(player.x, player.y + player.size, currentBiome.player, 10);
             }
-        }, { passive: false });
+        });
 
         function createParticles(x, y, color, count) {
             for (let i = 0; i < count; i++) {
@@ -102,7 +109,19 @@
                 width: 40 * count,
                 count: count
             });
-            setTimeout(spawn, 1000 + Math.random() * 1500);
+            setTimeout(spawn, 1000 + Math.random() * 1200);
+        }
+
+        function updateBiome() {
+            // Lógica dos 109 pontos
+            const index = score >= 109 ? 1 : 0;
+            currentBiome = biomes[index];
+            
+            // Atualiza o texto e a cor da UI
+            levelEl.innerHTML = currentBiome.name;
+            levelEl.style.color = currentBiome.spike;
+            levelEl.style.textShadow = `0 0 10px ${currentBiome.spike}`;
+            scoreEl.style.textShadow = `0 0 15px ${currentBiome.player}`;
         }
 
         function resetGame() {
@@ -114,26 +133,20 @@
             player.dy = 0;
             player.rotation = 0;
             gameActive = true;
-            lastScoreTime = Date.now();
+            lastTimeScore = Date.now();
+            scoreEl.innerHTML = "0";
             updateBiome();
             requestAnimationFrame(update);
-        }
-
-        function updateBiome() {
-            let index = score >= 109 ? 1 : 0;
-            currentBiome = biomes[index];
-            levelEl.innerHTML = currentBiome.name;
-            levelEl.style.color = currentBiome.spike;
-            levelEl.style.textShadow = `0 0 10px ${currentBiome.spike}`;
         }
 
         function update() {
             if (!gameActive) return;
 
+            // Score por tempo: +3 a cada 6 seg
             let now = Date.now();
-            if (now - lastScoreTime >= 6000) {
+            if (now - lastTimeScore >= 6000) {
                 score += 3;
-                lastScoreTime = now;
+                lastTimeScore = now;
                 scoreEl.innerHTML = score;
                 updateBiome();
             }
@@ -141,6 +154,7 @@
             ctx.fillStyle = currentBiome.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Chão Neon
             ctx.shadowBlur = 15;
             ctx.shadowColor = currentBiome.spike;
             ctx.fillStyle = currentBiome.floor;
@@ -148,17 +162,21 @@
             ctx.shadowBlur = 0;
             
             ctx.strokeStyle = "white";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-1, floorY, canvas.width + 2, 2);
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY);
+            ctx.stroke();
 
+            // Estrada animada
             if (currentBiome.road) {
-                ctx.fillStyle = "yellow";
-                for (let i = 0; i < 15; i++) {
-                    let x = ( (Date.now() * speed / 20) % 200) * -1 + (i * 200);
-                    ctx.fillRect(x, floorY + 35, 40, 5);
+                ctx.fillStyle = "#ffff00";
+                let offset = (Date.now() / 10 * speed) % 200;
+                for (let i = -1; i < canvas.width / 200 + 1; i++) {
+                    ctx.fillRect(i * 200 - offset + 50, floorY + 35, 60, 8);
                 }
             }
 
+            // Jogador
             player.dy += gravity;
             player.y += player.dy;
             if (player.y + player.size > floorY) {
@@ -167,7 +185,7 @@
                 player.grounded = true;
                 player.rotation = Math.round(player.rotation / 90) * 90;
             } else {
-                player.rotation += 6;
+                player.rotation += 7;
             }
 
             ctx.save();
@@ -176,15 +194,17 @@
             ctx.shadowBlur = 20;
             ctx.shadowColor = currentBiome.player;
             ctx.strokeStyle = currentBiome.player;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 5;
             ctx.strokeRect(-20, -20, 40, 40);
             ctx.restore();
 
+            // Obstáculos
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let o = obstacles[i];
                 o.x -= speed;
+
                 ctx.fillStyle = currentBiome.spike;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 15;
                 ctx.shadowColor = currentBiome.spike;
                 for (let n = 0; n < o.count; n++) {
                     let sx = o.x + (n * 40);
@@ -196,6 +216,7 @@
                 }
                 ctx.shadowBlur = 0;
 
+                // Colisão
                 if (player.x < o.x + o.width - 10 && player.x + 40 > o.x + 10 && player.y + 40 > floorY - 35) {
                     gameActive = false;
                     gameOver();
@@ -205,19 +226,20 @@
                     obstacles.splice(i, 1);
                     score += 1;
                     scoreEl.innerHTML = score;
-                    speed += 0.05;
+                    speed += 0.06;
                     updateBiome();
                 }
             }
 
+            // Partículas
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                p.x += p.vx; p.y += p.vy; p.life -= 0.025;
                 if (p.life <= 0) particles.splice(i, 1);
                 else {
                     ctx.globalAlpha = p.life;
                     ctx.fillStyle = p.color;
-                    ctx.fillRect(p.x, p.y, 3, 3);
+                    ctx.fillRect(p.x, p.y, 4, 4);
                 }
             }
             ctx.globalAlpha = 1;
@@ -226,14 +248,14 @@
         }
 
         function gameOver() {
-            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillStyle = "rgba(0,0,0,0.85)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
-            ctx.font = "bold 30px Arial";
+            ctx.font = "bold 40px Arial";
             ctx.fillText("BATEU!", canvas.width/2, canvas.height/2);
             ctx.font = "20px Arial";
-            ctx.fillText("Toque para Reiniciar", canvas.width/2, canvas.height/2 + 50);
+            ctx.fillText("Toque para Reiniciar", canvas.width/2, canvas.height/2 + 60);
         }
 
         spawn();
