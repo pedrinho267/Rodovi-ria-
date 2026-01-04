@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Dash - Level 109</title>
+    <title>Neon Dash - Score Progressivo</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
@@ -30,14 +30,25 @@
         let gameActive = true;
         let speed = 7;
         const floorY = canvas.height - 80;
+        let scoreInterval; // Variável para o temporizador de pontos
 
-        // --- SISTEMA DE BIOMAS NEON ---
         const biomes = [
             { name: "Escuridão Neon", bg: "#050010", floor: "#1a0033", spike: "#ff0055", player: "#00ff00", road: false },
             { name: "Rua Futurista", bg: "#0d1b2a", floor: "#1b263b", spike: "#00d4ff", player: "#ffffff", road: true }
         ];
         let currentBiome = biomes[0];
         let lineOffset = 0;
+
+        // Lógica de aumentar 3 pontos a cada 6 segundos
+        function startScoreTimer() {
+            scoreInterval = setInterval(() => {
+                if (gameActive) {
+                    score += 3;
+                    ui.innerHTML = "SCORE: " + score;
+                    updateBiome();
+                }
+            }, 6000); // 6000ms = 6 segundos
+        }
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playJumpSound() {
@@ -72,8 +83,9 @@
 
         window.addEventListener('touchstart', (e) => {
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (!gameActive) { resetGame(); } 
-            else if (player.grounded) {
+            if (!gameActive) {
+                resetGame();
+            } else if (player.grounded) {
                 player.dy = player.jumpForce;
                 player.grounded = false;
                 playJumpSound();
@@ -95,11 +107,12 @@
             player.y = floorY - player.size; player.dy = 0; player.rotation = 0;
             updateBiome();
             gameActive = true; ui.innerHTML = "SCORE: 0";
+            clearInterval(scoreInterval); // Reinicia o temporizador
+            startScoreTimer();
             update();
         }
 
         function updateBiome() {
-            // MUDANÇA PARA SCORE 109
             let index = score >= 109 ? 1 : 0;
             currentBiome = biomes[index];
             levelNameDisplay.innerHTML = currentBiome.name;
@@ -110,11 +123,9 @@
         function update() {
             if (!gameActive) return;
             
-            // Fundo
             ctx.fillStyle = currentBiome.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Chão com Brilho Neon
             ctx.shadowBlur = 15;
             ctx.shadowColor = currentBiome.spike;
             ctx.fillStyle = currentBiome.floor;
@@ -125,7 +136,6 @@
             ctx.strokeRect(-1, floorY, canvas.width + 2, 2);
             ctx.shadowBlur = 0;
 
-            // Faixas da Rua (se estiver no bioma de rua)
             if (currentBiome.road) {
                 lineOffset -= speed;
                 if (lineOffset < -100) lineOffset = 0;
@@ -137,7 +147,6 @@
                 ctx.shadowBlur = 0;
             }
 
-            // Partículas
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 p.x += p.vx; p.y += p.vy; p.life -= 0.025;
@@ -150,7 +159,6 @@
             }
             ctx.globalAlpha = 1;
 
-            // Jogador Neon
             player.dy += gravity;
             player.y += player.dy;
             if (player.y + player.size > floorY) {
@@ -167,11 +175,8 @@
             ctx.shadowBlur = 20; ctx.shadowColor = currentBiome.player;
             ctx.strokeStyle = currentBiome.player; ctx.lineWidth = 4;
             ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
-            ctx.fillStyle = "rgba(255,255,255,0.1)";
-            ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
             ctx.restore();
 
-            // Espinhos Neon
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const group = obstacles[i];
                 group.x -= speed;
@@ -187,7 +192,6 @@
                     ctx.lineTo(startX + 20, floorY - 40);
                     ctx.lineTo(startX + 40, floorY);
                     ctx.fill();
-                    // Linha branca no topo do espinho para dar efeito de brilho intenso
                     ctx.strokeStyle = "#fff";
                     ctx.lineWidth = 1;
                     ctx.stroke();
@@ -197,12 +201,13 @@
                 if (player.x < group.x + group.width - 12 && player.x + player.size > group.x + 12 &&
                     player.y + player.size > floorY - 35) {
                     gameActive = false;
+                    clearInterval(scoreInterval); // Para os pontos ao morrer
                     gameOver();
                 }
 
                 if (group.x + group.width < 0) {
                     obstacles.splice(i, 1);
-                    score++;
+                    score++; // Ganha 1 ponto por saltar
                     speed += 0.08;
                     ui.innerHTML = "SCORE: " + score;
                     updateBiome();
@@ -219,6 +224,7 @@
             ctx.font = "18px Arial"; ctx.fillText("Toque para recomeçar", canvas.width/2, canvas.height/2 + 50);
         }
 
+        startScoreTimer(); // Inicia o bónus de tempo
         spawnObstacle();
         update();
     </script>
